@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CustomerSuite\Access;
 use CustomerSuite\Accounts;
+use CustomerSuite\BatchJobs;
 use CustomerSuite\Contacts;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
@@ -314,6 +315,30 @@ $queued = $successClient->call($renewalPath, 'POST', http_build_query([
 same(303, $queued['code'], 'Outreach form records requested intent.');
 same(true, str_contains($successClient->call($renewalPath)['body'], '该渠道缺少客户成功触达授权'), 'Consent rejection is persisted and visible.');
 same(404, $serviceClient->call($renewalPath)['code'], 'Service-only role cannot access customer success details.');
+
+$batchPath = '/?company=' . $a . '&view=batches';
+$job = $db->row('SELECT id,version FROM outreach_jobs WHERE company_id = ? AND renewal_id = ?', [$a, $renewal['id']]);
+$selection = $job['id'] . ':' . $job['version'];
+$startBatchPage = $successClient->call($batchPath);
+same(200, $startBatchPage['code'], 'Customer success can open scoped batch workbench.');
+same(true, str_contains($startBatchPage['body'], 'name="data[items][]" value="' . $selection . '"'), 'Workbench renders selected record and its version together.');
+same(404, $serviceClient->call($batchPath)['code'], 'Service role cannot access the batch workbench.');
+$createdBatch = $successClient->call($batchPath, 'POST', http_build_query([
+    'action' => 'batch.create', 'csrf' => $successClient->csrf, 'request_key' => 'batch-' . $tag,
+    'data' => ['kind' => 'outreach.process', 'items' => [$selection]],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $createdBatch['code'], 'Selected outreach jobs are submitted through the HTML form.');
+$savedBatch = $successClient->call('/api.php?resource=receipts&company=' . $a . '&key=batch-' . $tag);
+$batchId = json_decode($savedBatch['body'], true, flags: JSON_THROW_ON_ERROR)['result']['id'];
+$batchDetail = $batchPath . '&id=' . $batchId;
+same(true, in_array('Location: ' . $batchDetail, $createdBatch['headers'], true), 'Successful submission redirects directly to the resumable task.');
+same(true, str_contains($successClient->call($batchDetail)['body'], '待处理 1'), 'Task shows an unstarted item before the worker runs.');
+(new BatchJobs($db))->run($actor, $a, 1, $batchId);
+$settledBatch = $successClient->call($batchDetail);
+same(true, str_contains($settledBatch['body'], '#outreach-' . $job['id']), 'Batch displays a deep link to the selected outreach record.');
+same(true, str_contains($successClient->call($renewalPath)['body'], 'id="outreach-' . $job['id'] . '"'), 'Deep link resolves to the matching record on the renewal page.');
+same(true, str_contains($settledBatch['body'], '该渠道缺少客户成功触达授权'), 'Batch preserves the gate rejection reason.');
+same(false, str_contains($settledBatch['body'], 'value="batch.retry"'), 'Business rejection does not offer a blind replay.');
 
 $branch = $identity->addCompany($admin, 'R-HTTP-' . $tag, '报表子公司独立数据', $a);
 $branchAccount = $accounts->create($admin, $branch, ['name' => '子公司独立数据客户']);

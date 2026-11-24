@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CustomerSuite\Access;
 use CustomerSuite\Accounts;
+use CustomerSuite\BatchJobs;
 use CustomerSuite\Contacts;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
@@ -176,12 +177,62 @@ same('retryable', $stillExternal['state'], 'Changing the environment cannot turn
 $cancelled = $write($owner, 'outreach.cancel', ['id' => $external['id'], 'version' => $stillExternal['version'], 'reason' => '暂停此渠道切换']);
 same('cancelled', $cancelled['state'], 'Cancelling a retryable task leaves its history intact.');
 
+$batchQueue = static fn (string $message): array => array_intersect_key($write($owner, 'outreach.queue',
+    $renewalVersion + ['contact_id' => $contact['id'], 'channel' => 'email', 'message' => $message]), ['id' => true, 'version' => true]);
+$localBatch = $batchQueue('可回放的例行续约检查。');
+putenv('CRM_OUTREACH_MODE=webhook');
+$remoteOne = $batchQueue('渠道故障时的第一条。');
+$remoteTwo = $batchQueue('渠道故障时的第二条。');
+$queued = $write($owner, 'batch.create', ['kind' => 'outreach.process', 'items' => [$localBatch, $remoteOne, $remoteTwo]]);
+$batchId = ['id' => $queued['id']];
+$batchWork = new BatchJobs($db);
+same(0, (new Outreach($db))->processDue($manager, $a)['count'], 'Generic scheduler leaves selected batch dispatches to batch workers.');
+putenv('CRM_OUTREACH_MODE=replay');
+same(1, $batchWork->run($manager, $a, 1, $queued['id'])['count'], 'Replay item is handled on its own.');
+putenv('CRM_OUTREACH_MODE=webhook');
+same(2, $batchWork->run($manager, $a, 10, $queued['id'])['count'], 'Later worker resumes the same outreach batch.');
+$beforeRetry = $queries->read($owner, $a, 'batches', $batchId);
+same(['completed', 'retryable', 'retryable'], array_column($beforeRetry['items'], 'state'), 'Configuration failure is stored per selected item.');
+same('partial', $beforeRetry['state'], 'Mixed dispatch outcomes remain visible.');
+same($renewal['id'], $beforeRetry['items'][0]['renewal_id'], 'Completed dispatch can return to the source renewal.');
+$selectedRetry = array_intersect_key($beforeRetry['items'][1], ['id' => true, 'version' => true]);
+$retryData = $batchId + ['items' => [$selectedRetry]];
+$write($owner, 'batch.retry', $retryData, 'batch-outreach-retry');
+same(true, $ops->execute($owner, $a, 'batch.retry', 'batch-outreach-retry', $retryData)['replayed'], 'Retry command can recover its original receipt.');
+rejects(409, fn () => $write($owner, 'batch.retry', $retryData), 'Stale retry selection cannot requeue again.');
+same(['completed', 'pending', 'retryable'], array_column($queries->read($owner, $a, 'batches', $batchId)['items'], 'state'),
+    'Retry queues only the requested failed item.');
+$idempotency = static fn (): string => $db->row('SELECT idempotency_key FROM outreach_jobs WHERE company_id = ? AND id = ?', [$a, $remoteOne['id']])['idempotency_key'];
+$oldKey = $idempotency();
+$portProbe = stream_socket_server('tcp://127.0.0.1:0');
+if ($portProbe === false) {
+    throw new RuntimeException('Unable to reserve a loopback test port.');
+}
+$loopback = stream_socket_get_name($portProbe, false);
+fclose($portProbe);
+putenv('CRM_OUTREACH_WEBHOOK=https://' . $loopback . '/batch-probe');
+putenv('CRM_OUTREACH_SECRET=' . bin2hex(random_bytes(24)));
+same(1, $batchWork->run($manager, $a, 10, $queued['id'])['count'], 'Only one item is retried.');
+$waitingBatch = $queries->read($owner, $a, 'batches', $batchId);
+same(['completed', 'waiting_external', 'retryable'], array_column($waitingBatch['items'], 'state'), 'Unknown gateway response is distinct from bad configuration.');
+same([1, 2, 1], array_column($waitingBatch['items'], 'attempts'), 'Completed and untouched items keep their prior counts.');
+same($oldKey, $idempotency(), 'Gateway retry preserves the immutable submission key.');
+same(false, str_contains(Input::json($waitingBatch), 'consent@example.test'), 'Batch records do not contain the delivery address.');
+putenv('CRM_OUTREACH_MODE=replay');
+putenv('CRM_OUTREACH_WEBHOOK');
+putenv('CRM_OUTREACH_SECRET');
+
 $working = $write($owner, 'renewal.follow-up', $renewalVersion + ['next_follow_up' => $date(1), 'reason' => '安排客户预算会']);
 same('working', $working['state'], 'Assigned owner sets follow-up.');
 $write($manager, 'success.assign', array_replace($assign, ['assignment_version' => 1, 'owner_id' => $replacement->userId]));
 rejects(404, fn () => $queries->read($owner, $a, 'renewals', $renewal), 'Reassigned former owner cannot read renewal.');
 rejects(404, fn () => (new Receipts($db))->read($owner, $a, 'original-health'), 'Reassigned former owner cannot read old health receipt.');
 rejects(404, fn () => (new Receipts($db))->read($owner, $a, 'owner-outreach'), 'Reassigned former owner cannot read old outreach receipt.');
+$hiddenBatch = $queries->read($owner, $a, 'batches', $batchId);
+same([false, false, false], array_column($hiddenBatch['items'], 'can_open'), 'Former owner retains submitted batch history with no source links.');
+same([null, null, null], array_column($hiddenBatch['items'], 'result'), 'Former owner no longer sees dispatch receipts or renewal identifiers.');
+rejects(404, fn () => $write($owner, 'batch.retry', $batchId + ['items' => [array_intersect_key($hiddenBatch['items'][1],
+    ['id' => true, 'version' => true])]]), 'Former owner cannot retry a reassigned renewal.');
 $newVersion = $queries->read($replacement, $a, 'renewals', $renewal)['version'];
 same($working['version'] + 1, $newVersion, 'Version advances on owner handoff.');
 $lose = $renewal + ['version' => $newVersion, 'outcome' => 'lost', 'code' => 'price', 'reason' => '客户年度预算未通过'];

@@ -72,6 +72,9 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
 };
 ?>
 <?php if (!$detail): ?>
+    <?php if ($view === 'leads' && $actor->has($chosen, 'manager', 'marketing')): ?>
+        <a class="pager" href="<?= e(url(['company' => $chosen, 'view' => 'batches', 'kind' => 'lead.reassign'])) ?>">批量分配线索</a>
+    <?php endif; ?>
     <?php if (isset(Workbench::FILTERS[$view])): ?>
         <nav class="filters" aria-label="状态筛选">
             <?php foreach (Workbench::FILTERS[$view] as $i => $status): ?>

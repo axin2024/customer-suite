@@ -66,6 +66,11 @@ final class Queries
                     isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX)]
                 : (new Reports($this->db))->detail($actor, $company, $id, $query),
             'report-rates' => ['items' => (new ReportRates($this->db))->list($actor, $company)],
+            'batches' => $id === null
+                ? (new BatchJobs($this->db))->list($actor, $company, isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX)
+                : (new BatchJobs($this->db))->detail($actor, $company, $id, $after),
+            'batch-candidates' => (new BatchJobs($this->db))->candidates($actor, $company,
+                Input::text($query['kind'] ?? null, '任务类型', 32), isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX),
             default => throw new BusinessError('未找到资源。', 404),
         };
     }

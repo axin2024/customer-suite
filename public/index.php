@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CustomerSuite\BusinessError;
+use CustomerSuite\BatchJobs;
 use CustomerSuite\Database;
 use CustomerSuite\Evidence;
 use CustomerSuite\Input;
@@ -91,6 +92,9 @@ try {
                 $back[$parameter] = (string) $query[$parameter];
             }
         }
+        if ($action === 'batch.create') {
+            $back = ['company' => $chosen, 'view' => 'batches', 'id' => $_SESSION['flash']['result']['id']];
+        }
         WebResponse::redirect($back);
     }
     if ($actor !== null) {
@@ -101,6 +105,13 @@ try {
         } elseif ($view !== 'home') {
             $section = Workbench::NAVIGATION[$view];
             $result = (new Queries($db))->read($actor, $chosen, $view, $query);
+            if ($view === 'batches' && !isset($query['id'])) {
+                $result['kinds'] = (new BatchJobs($db))->availableKinds($actor, $chosen);
+                $result['kind'] = Input::text($query['kind'] ?? array_key_first($result['kinds']), '任务类型', 32);
+                $result['candidates'] = (new Queries($db))->read($actor, $chosen, 'batch-candidates', [
+                    'kind' => $result['kind'], 'before' => $query['candidates_before'] ?? null,
+                ]);
+            }
             if ($view === 'accounts' && isset($query['id'])) {
                 $result['contacts'] = (new Queries($db))->read($actor, $chosen, 'contacts', ['id' => $query['id']])['items'];
             }

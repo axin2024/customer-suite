@@ -71,6 +71,8 @@ final class Receipts
             (new Reports($this->db))->assertReceipt($actor, $company, (int) $result['id']);
         } elseif ($action === 'report.fx') {
             $actor->allow($company, 'manager');
+        } elseif (str_starts_with($action, 'batch.')) {
+            (new BatchJobs($this->db))->readable($actor, $company, (int) $result['id']);
         }
     }
 

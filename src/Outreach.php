@@ -114,13 +114,23 @@ final class Outreach
         );
     }
 
+    public function readable(Access $actor, int $company, int $id): array
+    {
+        $actor->allow($company, 'manager', 'success');
+        $job = $this->row($company, $id);
+        $this->renewals->readable($actor, $company, $job['renewal_id']);
+        return $this->result($job);
+    }
+
     public function processDue(Access $actor, int $company): array
     {
         $actor->allow($company, 'manager');
         $pending = $this->db->rows(
-            "SELECT id,version FROM outreach_jobs WHERE company_id = ? AND
-                (state = 'queued' OR (state = 'retryable' AND retry_after <= UTC_TIMESTAMP(6)))
-             ORDER BY id LIMIT 20", [$company],
+            "SELECT o.id,o.version FROM outreach_jobs o WHERE o.company_id = ?
+             AND (o.state = 'queued' OR (o.state = 'retryable' AND o.retry_after <= UTC_TIMESTAMP(6)))
+             AND NOT EXISTS (SELECT 1 FROM batch_items i WHERE i.company_id = o.company_id AND i.subject_id = o.id
+                 AND i.renewal_id = o.renewal_id AND i.state IN ('pending','retryable','waiting_external'))
+             ORDER BY o.id LIMIT 20", [$company],
         );
         $ops = new Operations($this->db);
         $items = [];

@@ -62,6 +62,8 @@ final class Operations
         'outreach.cancel' => ['id:i', 'version:i', 'reason'],
         'report.fx' => ['rate_date', 'source', 'rates:j'],
         'report.capture' => ['label', 'as_of?', 'cohort_start?', 'fx_set_id:i', 'company_ids:j?'],
+        'batch.create' => ['kind', 'items:v', 'owner_id:i?', 'reason?'],
+        'batch.retry' => ['id:i', 'items:v'],
     ];
 
     public function __construct(private readonly Database $db)
@@ -139,6 +141,8 @@ final class Operations
             'outreach.cancel' => (new Outreach($this->db))->cancel($actor, $companyId, $data),
             'report.fx' => (new ReportRates($this->db))->create($actor, $companyId, $data),
             'report.capture' => (new ReportCapture($this->db))->capture($actor, $companyId, $data),
+            'batch.create' => (new BatchJobs($this->db))->create($actor, $companyId, $data),
+            'batch.retry' => (new BatchJobs($this->db))->retry($actor, $companyId, $data),
         };
     }
 
@@ -164,6 +168,7 @@ final class Operations
                     default => throw new BusinessError('请选择同意或撤回。'),
                 },
                 'j' => self::structured($value, $name),
+                'v' => BatchJobs::selection(self::structured($value, $name)),
                 default => Input::text($value, $name, 4096),
             };
         }

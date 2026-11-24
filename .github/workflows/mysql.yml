@@ -37,6 +37,7 @@ jobs:
             php tests/calendar.php
             php tests/service-desk.php
             php tests/customer-success.php
+            php tests/batch-jobs.php
             php tests/outreach-gateway.php
             php tests/management-reports.php
             php -S 127.0.0.1:8081 -t public >/tmp/crm-http.log 2>&1 &

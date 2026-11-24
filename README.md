@@ -36,6 +36,8 @@ docker compose exec -T -e CRM_ADMIN_PASSWORD web php bin/crm.php init-admin admi
 
 [报价、签约与交付](docs/sales-delivery.md) · [服务台与 SLA](docs/service-desk.md) · [客户成功与续约](docs/customer-success.md) · [经营分析](docs/management-reports.md)
 
+线索分配和续约触达支持 [可恢复批量任务](docs/batch-jobs.md)。工作台保存选集，处理器逐条提交，页面显示原记录、结果及可重试项。
+
 ## 兼容与验收
 
 - 七份 [产品需求](docs/requirements/01-产品总览-prd.md) 和 [验收标准](docs/requirements/04-验收与运营-prd.md) 随仓库分发。

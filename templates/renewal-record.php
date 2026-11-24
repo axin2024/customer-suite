@@ -52,9 +52,10 @@ $renewalVersion = ['id' => $result['id'], 'version' => $result['version']];
     <?php endif; ?>
 <?php endif; ?>
 <section class="panel table-panel"><h2>触达队列与回执</h2>
+    <a class="pager" href="<?= e(url(['company' => $chosen, 'view' => 'batches', 'kind' => 'outreach.process'])) ?>">批量处理续约触达</a>
     <?php if ($result['outreach'] === []): ?><p class="empty">暂无触达记录</p><?php endif; ?>
     <?php foreach ($result['outreach'] as $job): ?>
-        <article>
+        <article id="outreach-<?= e($job['id']) ?>">
             <h3>#<?= e($job['id']) ?> · <?= e(Outreach::CHANNELS[$job['channel']]) ?> · <?= e($state($job['state'])) ?></h3>
             <p>联系人 #<?= e($job['contact_id']) ?> · 渠道提交 <?= e($job['attempts']) ?> 次
                 <?php if ($job['block_reason']): ?> · <?= e(Outreach::BLOCKS[$job['block_reason']]) ?><?php endif; ?>

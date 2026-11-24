@@ -101,6 +101,8 @@ $title = $section[0] ?? ($view === 'settings' ? '组织与权限' : '工作台')
                     <?php require __DIR__ . '/customer-success.php'; ?>
                 <?php elseif ($view === 'reports' && $result !== null): ?>
                     <?php require __DIR__ . '/reports.php'; ?>
+                <?php elseif ($view === 'batches' && $result !== null): ?>
+                    <?php require __DIR__ . '/batches.php'; ?>
                 <?php elseif ($result !== null): ?>
                     <?php require __DIR__ . '/records.php'; ?>
                 <?php endif; ?>
