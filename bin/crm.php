@@ -6,6 +6,7 @@ use CustomerSuite\BusinessError;
 use CustomerSuite\Access;
 use CustomerSuite\BatchJobs;
 use CustomerSuite\Database;
+use CustomerSuite\DemoWorkspace;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
 use CustomerSuite\Migrations;
@@ -20,7 +21,9 @@ if ($command === 'help') {
     echo "Customer Suite\n  migrate\n  health\n  init-admin <邮箱> <姓名>\n  sla-sweep <公司编号> <经理编号>\n";
     echo "  renewal-scan <公司编号> <经理编号> [窗口天数]\n  outreach-due <公司编号> <经理编号>\n";
     echo "  batch-run <公司编号> <经理编号> [条目数] [任务编号]\n";
+    echo "  demo-install <演示库管理员邮箱>\n";
     echo "初始化管理员前，通过环境变量 CRM_ADMIN_PASSWORD 提供密码。\n";
+    echo "导入演示前，通过环境变量 CRM_DEMO_PASSWORD 提供演示岗位密码。\n";
     exit(0);
 }
 
@@ -33,6 +36,7 @@ try {
         'init-admin' => [
             'user_id' => (new Identity($db))->bootstrap($argv[3] ?? '', $argv[2] ?? '', (string) getenv('CRM_ADMIN_PASSWORD')),
         ],
+        'demo-install' => (new DemoWorkspace($db))->install($argv[2] ?? '', (string) getenv('CRM_DEMO_PASSWORD')),
         'sla-sweep' => (new ServiceTickets($db))->sweep(new Access($db, Input::id($argv[3] ?? null, '经理编号')),
             Input::id($argv[2] ?? null, '公司编号')),
         'renewal-scan' => (new Renewals($db))->scan(new Access($db, Input::id($argv[3] ?? null, '经理编号')),

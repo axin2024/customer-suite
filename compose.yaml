@@ -4,7 +4,7 @@ x-crm-app: &app
   build: .
   image: customer-suite:local
   environment:
-    CRM_DSN: mysql:host=db;port=3306;dbname=customer_suite;charset=utf8mb4
+    CRM_DSN: mysql:host=db;port=3306;dbname=${CRM_DB_NAME:-customer_suite};charset=utf8mb4
     CRM_DB_USER: customer_suite
     CRM_DB_PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in .env}
     CRM_SECURE_COOKIES: "${CRM_SECURE_COOKIES:-0}"
@@ -16,7 +16,7 @@ services:
   db:
     image: mysql:8.4
     environment:
-      MYSQL_DATABASE: customer_suite
+      MYSQL_DATABASE: ${CRM_DB_NAME:-customer_suite}
       MYSQL_USER: customer_suite
       MYSQL_PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${CRM_MYSQL_ROOT_PASSWORD:?Set CRM_MYSQL_ROOT_PASSWORD in .env}

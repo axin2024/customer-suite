@@ -21,6 +21,8 @@ docker compose exec -T -e CRM_ADMIN_PASSWORD web php bin/crm.php init-admin admi
 
 容器默认只对本机开放。原生运行需要 PHP 8.2+、`mbstring`、`pdo_mysql`、MySQL 8.4，设置 `CRM_DSN`（含 `charset=utf8mb4`）、`CRM_DB_USER` 和 `CRM_DB_PASSWORD` 后运行 `php bin/crm.php migrate`。Web 根目录指向 `public/`。
 
+从空库重现集团案例请看 [三公司演示](docs/demo.md)。演示使用单独的数据库和本机端口，包含五个岗位、三家子公司的合同、交付签收、续约、服务工单和集团报表。
+
 ## 业务流程
 
 | 业务域 | 可验证流程 |
@@ -44,5 +46,6 @@ docker compose exec -T -e CRM_ADMIN_PASSWORD web php bin/crm.php init-admin admi
 - 集成测试使用名字以 `crm_test` 开头的独立 MySQL 数据库。显式设置 `CRM_TEST_DATABASE=1`，按 [CI 工作流](.github/workflows/mysql.yml) 执行 MySQL 和 HTTP 测试。
 - 自托管备份及三公司联测的恢复核验见 [备份、恢复与校验](docs/backup-and-restore.md)。
 - 授权和业务记录以 MySQL 为准。管理入口和 JSON API 复用同一权限检查及恢复回执。
+- [部署配置](docs/configuration.md) · [贡献指南](CONTRIBUTING.md) · [安全反馈](SECURITY.md) · [依赖与素材](docs/third-party.md)
 
 Apache-2.0 开源许可。参见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
