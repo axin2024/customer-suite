@@ -102,6 +102,11 @@ final class Opportunities
         return $this->db->transaction(function () use ($actor, $company, $id, $version, $stage, $reason, $contactId, $followUp): array {
             $row = $this->writable($actor, $company, $id);
             Accounts::checkVersion($row, $version);
+            if (in_array($stage, ['won', 'lost'], true) && $this->db->row(
+                'SELECT id FROM renewals WHERE company_id = ? AND opportunity_id = ?', [$company, $id],
+            )) {
+                throw new BusinessError('续约商机须从续约工作台登记结果。', 409);
+            }
             if (!in_array($stage, self::PROGRESSION[$row['stage']], true)) {
                 throw new BusinessError('当前阶段不允许该变更。', 409);
             }
@@ -132,6 +137,23 @@ final class Opportunities
                 ['previous_stage' => $row['stage'], 'stage' => $stage, 'probability_bps' => $probability]);
             return ['id' => $id, 'version' => $version + 1, 'stage' => $stage, 'probability_bps' => $probability];
         });
+    }
+
+    public function finishRenewal(Access $actor, int $company, int $id, int $renewalId, bool $won, string $reason): void
+    {
+        $row = $this->row($company, $id, true);
+        $this->assertOpen($row);
+        $stage = $won ? 'won' : 'lost';
+        $version = $row['version'] + 1;
+        $probability = self::WEIGHTS[$stage];
+        $this->db->run(
+            'UPDATE opportunities SET stage = ?,probability_bps = ?,stage_reason = ?,next_follow_up = NULL,version = ?
+             WHERE company_id = ? AND id = ?',
+            [$stage, $probability, $reason, $version, $company, $id],
+        );
+        $this->history($actor, $company, $id, $version, $row['stage'], $stage, $probability, $reason);
+        $this->audit->record($actor, $company, 'opportunity', $id, $version, 'opportunity.renewal',
+            ['previous_stage' => $row['stage'], 'stage' => $stage, 'renewal_id' => $renewalId]);
     }
 
     public function detail(Access $actor, int $company, int $id, int $after = 0): array

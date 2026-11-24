@@ -7,6 +7,7 @@ use CustomerSuite\Database;
 use CustomerSuite\Evidence;
 use CustomerSuite\Input;
 use CustomerSuite\Operations;
+use CustomerSuite\Outreach;
 use CustomerSuite\Queries;
 use CustomerSuite\WebResponse;
 use CustomerSuite\WebSession;
@@ -103,10 +104,24 @@ try {
             if ($view === 'accounts' && isset($query['id'])) {
                 $result['contacts'] = (new Queries($db))->read($actor, $chosen, 'contacts', ['id' => $query['id']])['items'];
             }
+            if ($view === 'renewals' && isset($query['id'])) {
+                $outreach = new Outreach($db);
+                $result['outreach'] = $outreach->related($actor, $chosen, $result['id'],
+                    isset($query['outreach_after']) ? Input::id($query['outreach_after']) : 0);
+                $result['contacts'] = $result['is_current'] ? $outreach->contacts($actor, $chosen, $result['id']) : [];
+            }
+            if ($view === 'success-contracts' && isset($query['id'], $query['snapshot'])) {
+                $snapshot = (new Queries($db))->read($actor, $chosen, 'health', ['id' => $query['snapshot']]);
+                if ($snapshot['agreement_id'] !== $result['id']) {
+                    throw new BusinessError('未找到此合同的健康度记录。', 404);
+                }
+                $result['snapshot'] = $snapshot;
+            }
         }
     }
 } catch (BusinessError $failure) {
     http_response_code($failure->status);
+    $result = null;
     $error = $failure->getMessage();
     if (isset($failure->details['current_version'])) {
         $error .= ' 当前版本 ' . (int) $failure->details['current_version'] . '。';
@@ -116,6 +131,7 @@ try {
     }
 } catch (Throwable $failure) {
     http_response_code(503);
+    $result = null;
     $error = '服务暂时不可用。请稍后重试。';
     error_log('Customer Suite workbench: ' . $failure::class . ' ' . $failure->getCode());
 }

@@ -274,6 +274,47 @@ $identity->membership($admin, $a, $seller, 'manager', true);
 $client->login($email, $password);
 same(true, str_contains($client->call('/?company=' . $a . '&view=service-settings')['body'], '登记工作日历版本'), 'Manager can open versioned service configuration.');
 same(true, str_contains($client->call($ticketDetailPath)['body'], '复核服务资格'), 'Manager sees eligibility decision form.');
+
+$successEmail = $tag . '.success@example.test';
+$successId = $identity->addUser($admin, '测试工作台客户成功', $successEmail, $password);
+$identity->membership($admin, $a, $successId, 'success', true);
+$contractSuccessPath = '/?company=' . $a . '&view=success-contracts&id=' . $agreement['id'];
+$outreachPath = '/?company=' . $a . '&view=renewals';
+$successClient = new WorkbenchClient($base);
+$successClient->login($successEmail, $password);
+same(404, $successClient->call($contractSuccessPath)['code'], 'Unassigned customer success user cannot open contract details.');
+$assigned = $client->call($contractSuccessPath, 'POST', http_build_query([
+    'action' => 'success.assign', 'csrf' => $client->csrf, 'request_key' => 'success-assign-' . $tag,
+    'data' => ['agreement_id' => $agreement['id'], 'agreement_version' => 1, 'assignment_version' => '',
+        'owner_id' => $successId, 'reason' => '客户服务到期跟进'],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $assigned['code'], 'Manager assigns contract through HTML form.');
+$visible = $successClient->call($contractSuccessPath);
+same(200, $visible['code'], 'Assigned customer success contract details render.');
+same(true, str_contains($visible['body'], '采集健康度快照'), 'Customer success owner sees health capture form.');
+$captured = $successClient->json($api, ['action' => 'success.health', 'data' => ['agreement_id' => $agreement['id']]], 'health-' . $tag);
+same(200, $captured['code'], 'Health snapshot created through authorized JSON request.');
+$snapshot = json_decode($captured['body'], true, 16, JSON_THROW_ON_ERROR)['result']['id'];
+same(true, str_contains($successClient->call($contractSuccessPath . '&snapshot=' . $snapshot)['body'], '评分模型 v1'),
+    'Historical score opens its recorded source versions and deductions.');
+same(false, str_contains($successClient->call($outreachPath)['body'], 'value="renewal.scan"'), 'Only manager sees organization-wide scan form.');
+$scan = $client->json($api, ['action' => 'renewal.scan', 'data' => ['window_days' => 31]], 'scan-' . $tag);
+same(200, $scan['code'], 'Renewal scan runs over JSON endpoint.');
+$renewal = json_decode($scan['body'], true, 16, JSON_THROW_ON_ERROR)['result']['items'][0];
+$renewalPath = $outreachPath . '&id=' . $renewal['id'];
+$renderedRenewal = $successClient->call($renewalPath);
+same(200, $renderedRenewal['code'], 'Renewal detail renders in browser.');
+same(true, str_contains($renderedRenewal['body'], '登记流失原因'), 'Renewal offers an outcome form.');
+same(false, str_contains($renderedRenewal['body'], 'peer@example.test'), 'Destination is not exposed in renewal HTML.');
+$queued = $successClient->call($renewalPath, 'POST', http_build_query([
+    'action' => 'outreach.queue', 'csrf' => $successClient->csrf, 'request_key' => 'queue-' . $tag,
+    'data' => ['id' => $renewal['id'], 'version' => $renewal['version'], 'contact_id' => $contact['id'],
+        'channel' => 'email', 'message' => '续约资料已准备。'],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $queued['code'], 'Outreach form records requested intent.');
+same(true, str_contains($successClient->call($renewalPath)['body'], '该渠道缺少客户成功触达授权'), 'Consent rejection is persisted and visible.');
+same(404, $serviceClient->call($renewalPath)['code'], 'Service-only role cannot access customer success details.');
+
 $identity->membership($admin, $a, $seller, 'manager', false);
 $identity->membership($admin, $a, $seller, 'sales', false);
 same(401, $client->call('/api.php?resource=accounts&company=' . $a)['code'], 'Existing browser session expires after role revocation.');

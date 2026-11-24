@@ -8,6 +8,8 @@ use CustomerSuite\Database;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
 use CustomerSuite\Migrations;
+use CustomerSuite\Outreach;
+use CustomerSuite\Renewals;
 use CustomerSuite\ServiceTickets;
 
 require dirname(__DIR__) . '/src/bootstrap.php';
@@ -15,6 +17,7 @@ require dirname(__DIR__) . '/src/bootstrap.php';
 $command = $argv[1] ?? 'help';
 if ($command === 'help') {
     echo "Customer Suite\n  migrate\n  health\n  init-admin <邮箱> <姓名>\n  sla-sweep <公司编号> <经理编号>\n";
+    echo "  renewal-scan <公司编号> <经理编号> [窗口天数]\n  outreach-due <公司编号> <经理编号>\n";
     echo "初始化管理员前，通过环境变量 CRM_ADMIN_PASSWORD 提供密码。\n";
     exit(0);
 }
@@ -29,6 +32,10 @@ try {
             'user_id' => (new Identity($db))->bootstrap($argv[3] ?? '', $argv[2] ?? '', (string) getenv('CRM_ADMIN_PASSWORD')),
         ],
         'sla-sweep' => (new ServiceTickets($db))->sweep(new Access($db, Input::id($argv[3] ?? null, '经理编号')),
+            Input::id($argv[2] ?? null, '公司编号')),
+        'renewal-scan' => (new Renewals($db))->scan(new Access($db, Input::id($argv[3] ?? null, '经理编号')),
+            Input::id($argv[2] ?? null, '公司编号'), ['window_days' => $argv[4] ?? 30]),
+        'outreach-due' => (new Outreach($db))->processDue(new Access($db, Input::id($argv[3] ?? null, '经理编号')),
             Input::id($argv[2] ?? null, '公司编号')),
         default => throw new BusinessError('未知命令，请运行 php bin/crm.php help。'),
     };

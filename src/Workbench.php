@@ -17,6 +17,8 @@ final class Workbench
         'handovers' => ['交付交接', '确认范围与客户代表，办理里程碑和验收', ['manager', 'sales', 'delivery']],
         'tickets' => ['服务工单', '受理合同服务请求，跟踪响应与解决时限', ['manager', 'service']],
         'service-settings' => ['服务设置', '配置队列、合同授权与工作日历', ['manager']],
+        'success-contracts' => ['客户成功', '跟踪负责合同的健康度与续约周期', ['manager', 'success']],
+        'renewals' => ['续约工作台', '扫描到期合同、登记跟进与触达结果', ['manager', 'success']],
     ];
     public const STATES = [
         'active' => '正常', 'frozen' => '冻结', 'merged' => '已归并',
@@ -29,6 +31,9 @@ final class Workbench
         'scheduled' => '已排期', 'delayed' => '延期', 'completed' => '已完成',
         'review' => '服务资格待复核', 'waiting' => '等待客户', 'resolved' => '已解决', 'running' => '计时中',
         'paused' => '已暂停', 'complete' => '计时结束',
+        'working' => '跟进中', 'renewed' => '已续约', 'superseded' => '已转新周期',
+        'queued' => '待处理', 'blocked' => '已拦截', 'retryable' => '待重试', 'delivered' => '渠道已接收',
+        'replayed' => '回放完成', 'cancelled' => '已取消',
     ];
     public const FILTERS = [
         'accounts' => ['active', 'frozen', 'merged'],

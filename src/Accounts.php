@@ -105,6 +105,20 @@ final class Accounts
         }
     }
 
+    public function lockCurrent(int $company, int $id): array
+    {
+        $current = $this->currentId($company, $id);
+        $locked = [];
+        $ids = $current === $id ? [$id] : [min($id, $current), max($id, $current)];
+        foreach ($ids as $accountId) {
+            $locked[$accountId] = $this->account($company, $accountId, true);
+        }
+        if ($locked[$current]['state'] === 'merged') {
+            throw new BusinessError('客户已归并，请重试当前操作。', 409);
+        }
+        return $locked[$current];
+    }
+
     public function revise(Access $actor, int $companyId, int $id, int $version, ?int $owner, ?string $state): array
     {
         $actor->allow($companyId, 'manager');

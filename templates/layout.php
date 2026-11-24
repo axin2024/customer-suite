@@ -79,6 +79,8 @@ $title = $section[0] ?? ($view === 'settings' ? '组织与权限' : '工作台')
                         <?php if ($view === 'tickets' && isset($receipt['result']['count'])): ?> · 已升级 <?= e($receipt['result']['count']) ?> 条<?php endif; ?>
                         <?php if ($view === 'tickets' && !isset($query['id']) && isset($receipt['result']['id'])): ?>
                             <a href="<?= e(url(['company' => $chosen, 'view' => 'tickets', 'id' => $receipt['result']['id']])) ?>">查看工单</a>
+                        <?php elseif ($view === 'renewals' && isset($receipt['result']['created_count'])): ?>
+                            · 建立 <?= e($receipt['result']['created_count']) ?> 条续约<?= $receipt['result']['more'] ? ' · 还有待扫描合同' : '' ?>
                         <?php endif; ?></p>
                 <?php endif; ?>
                 <?php if ($view === 'home'): ?>
@@ -95,6 +97,8 @@ $title = $section[0] ?? ($view === 'settings' ? '组织与权限' : '工作台')
                     <?php require __DIR__ . '/settings.php'; ?>
                 <?php elseif ($view === 'service-settings' && $result !== null): ?>
                     <?php require __DIR__ . '/service-settings.php'; ?>
+                <?php elseif (in_array($view, ['success-contracts', 'renewals'], true) && $result !== null): ?>
+                    <?php require __DIR__ . '/customer-success.php'; ?>
                 <?php elseif ($result !== null): ?>
                     <?php require __DIR__ . '/records.php'; ?>
                 <?php endif; ?>

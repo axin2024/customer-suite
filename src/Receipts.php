@@ -61,6 +61,12 @@ final class Receipts
             (new ServiceTickets($this->db))->readable($actor, $company, (int) $result['id']);
         } elseif (str_starts_with($action, 'handover.')) {
             (new Handovers($this->db))->readable($actor, $company, (int) $result['id']);
+        } elseif (in_array($action, ['renewal.scan', 'success.assign'], true)) {
+            $actor->allow($company, 'manager');
+        } elseif ($action === 'success.health' || str_starts_with($action, 'renewal.')) {
+            (new SuccessContracts($this->db))->readable($actor, $company, (int) $result['agreement_id']);
+        } elseif (str_starts_with($action, 'outreach.')) {
+            (new Renewals($this->db))->readable($actor, $company, (int) $result['renewal_id']);
         }
     }
 

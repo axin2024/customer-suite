@@ -25,10 +25,11 @@ final class WorklistPage
         return new self($updatedAt, Input::id($pieces[2]));
     }
 
-    public function clause(string $alias = ''): string
+    public function clause(string $alias = '', string $timestamp = 'updated_at'): string
     {
         $prefix = $alias === '' ? '' : $alias . '.';
-        return $this->id === null ? '' : " AND ({$prefix}updated_at < ? OR ({$prefix}updated_at = ? AND {$prefix}id < ?))";
+        $sort = $prefix . $timestamp;
+        return $this->id === null ? '' : " AND ($sort < ? OR ($sort = ? AND {$prefix}id < ?))";
     }
 
     public function parameters(): array

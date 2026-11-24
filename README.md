@@ -1,6 +1,6 @@
 # Customer Suite · 企业 CRM 与客户服务管理系统
 
-自托管的 PHP 与 MySQL 应用。按公司和岗位管理客户主档、销售、合同和交付。
+自托管的 PHP 与 MySQL 应用。按公司和岗位管理客户主档、销售、合同、交付、服务与续约。
 
 ## 本地启动
 
@@ -31,8 +31,9 @@ docker compose exec -T -e CRM_ADMIN_PASSWORD web php bin/crm.php init-admin admi
 | 报价与合同 | 报价修订、折扣审批、集团分签、签署凭据及保留原件的补充协议 |
 | 交付交接 | 双岗位确认范围、变更客户代表与实施人员、跟踪延期和待确认事项、上传并核验合同版本的签收附件 |
 | 服务台 | 按合同授权、分类派发、并行响应和解决时钟、等待客户暂停、到期升级与资格复核 |
+| 客户成功 | 合同负责人、可解释健康度快照、唯一续约商机、流失原因、触达队列与授权复核 |
 
-[报价、签约与交付](docs/sales-delivery.md) · [服务台与 SLA](docs/service-desk.md)
+[报价、签约与交付](docs/sales-delivery.md) · [服务台与 SLA](docs/service-desk.md) · [客户成功与续约](docs/customer-success.md)
 
 ## 兼容与验收
 

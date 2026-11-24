@@ -52,6 +52,14 @@ final class Operations
         'ticket.note' => ['id:i', 'version:i', 'body'],
         'ticket.advance' => ['id:i', 'version:i', 'action', 'reason', 'occurred_at?'],
         'ticket.sweep' => ['occurred_at?'],
+        'success.assign' => ['agreement_id:i', 'agreement_version:i', 'assignment_version:i?', 'owner_id:i', 'reason'],
+        'success.health' => ['agreement_id:i'],
+        'renewal.scan' => ['as_of?', 'window_days:n?'],
+        'renewal.follow-up' => ['id:i', 'version:i', 'next_follow_up', 'reason'],
+        'renewal.decide' => ['id:i', 'version:i', 'outcome', 'code', 'reason', 'evidence_ref?'],
+        'outreach.queue' => ['id:i', 'version:i', 'contact_id:i', 'channel', 'message'],
+        'outreach.process' => ['id:i', 'version:i'],
+        'outreach.cancel' => ['id:i', 'version:i', 'reason'],
     ];
 
     public function __construct(private readonly Database $db)
@@ -119,6 +127,14 @@ final class Operations
             'ticket.note' => (new ServiceTickets($this->db))->note($actor, $companyId, $data['id'], $data['version'], $data['body']),
             'ticket.advance' => (new ServiceTickets($this->db))->advance($actor, $companyId, $data['id'], $data['version'], $data),
             'ticket.sweep' => (new ServiceTickets($this->db))->sweep($actor, $companyId, $data['occurred_at'] ?? null),
+            'success.assign' => (new SuccessContracts($this->db))->assign($actor, $companyId, $data),
+            'success.health' => (new HealthSnapshots($this->db))->capture($actor, $companyId, $data['agreement_id']),
+            'renewal.scan' => (new Renewals($this->db))->scan($actor, $companyId, $data),
+            'renewal.follow-up' => (new Renewals($this->db))->followUp($actor, $companyId, $data),
+            'renewal.decide' => (new Renewals($this->db))->decide($actor, $companyId, $data),
+            'outreach.queue' => (new Outreach($this->db))->queue($actor, $companyId, $data),
+            'outreach.process' => (new Outreach($this->db))->process($actor, $companyId, $data),
+            'outreach.cancel' => (new Outreach($this->db))->cancel($actor, $companyId, $data),
         };
     }
 

@@ -50,6 +50,17 @@ final class Queries
                     isset($query['queue']) ? Input::id($query['queue']) : null, $cursor)
                 : (new ServiceTickets($this->db))->detail($actor, $company, $id, $after, Input::optionalText($query['at'] ?? null, '查看时点', 35)),
             'receipts' => (new Receipts($this->db))->read($actor, $company, Input::key($query['key'] ?? null, '请求标识', 128)),
+            'success-contracts' => $id === null
+                ? (new SuccessContracts($this->db))->list($actor, $company, $cursor)
+                : (new SuccessContracts($this->db))->detail($actor, $company, $id),
+            'health' => $id === null
+                ? (new HealthSnapshots($this->db))->list($actor, $company, Input::optionalText($query['state'] ?? null, '健康度等级', 20), $cursor)
+                : (new HealthSnapshots($this->db))->detail($actor, $company, $id),
+            'renewals' => $id === null
+                ? (new Renewals($this->db))->list($actor, $company, Input::optionalText($query['state'] ?? null, '续约状态', 20), $cursor)
+                : (new Renewals($this->db))->detail($actor, $company, $id, $after),
+            'outreach' => ['items' => (new Outreach($this->db))->related($actor, $company,
+                $id ?? throw new BusinessError('须指定续约编号。'), $after)],
             default => throw new BusinessError('未找到资源。', 404),
         };
     }
