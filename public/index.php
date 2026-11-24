@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CustomerSuite\BusinessError;
 use CustomerSuite\Database;
+use CustomerSuite\Evidence;
 use CustomerSuite\Input;
 use CustomerSuite\Operations;
 use CustomerSuite\Queries;
@@ -68,6 +69,9 @@ try {
         $fields = $_POST['data'] ?? [];
         if (!is_array($fields)) {
             throw new BusinessError('表单格式无效。');
+        }
+        if ($action === 'handover.accept' && isset($_FILES['evidence_upload'])) {
+            $fields = array_replace($fields, Evidence::uploaded($_FILES['evidence_upload']));
         }
         $back = $chosen === null ? [] : ['company' => $chosen];
         if (str_starts_with($action, 'admin.')) {

@@ -8,6 +8,7 @@ use CustomerSuite\Contacts;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
 use CustomerSuite\Opportunities;
+use CustomerSuite\Operations;
 
 require __DIR__ . '/bootstrap.php';
 
@@ -79,6 +80,18 @@ final class WorkbenchClient
         } finally {
             fclose($socket);
         }
+    }
+
+    public function upload(string $path, array $fields, string $fileName, string $fileBytes): array
+    {
+        $boundary = 'CrmTest-' . bin2hex(random_bytes(12));
+        $body = '';
+        foreach ($fields as $key => $value) {
+            $body .= "--$boundary\r\nContent-Disposition: form-data; name=\"$key\"\r\n\r\n$value\r\n";
+        }
+        $body .= "--$boundary\r\nContent-Disposition: form-data; name=\"evidence_upload\"; filename=\"$fileName\"\r\n"
+            . "Content-Type: text/plain\r\n\r\n$fileBytes\r\n--$boundary--\r\n";
+        return $this->call($path, 'POST', $body, ['Content-Type: multipart/form-data; boundary=' . $boundary]);
     }
 }
 
@@ -196,6 +209,41 @@ same(true, str_contains($client->call($quotePath)['body'], '签约合同'), 'Sig
 $contractPage = $client->call('/?company=' . $a . '&view=agreements&id=' . $agreement['id']);
 same(200, $contractPage['code'], 'Contract detail responds successfully.');
 same(true, str_contains($contractPage['body'], 'EVIDENCE-' . $tag), 'Contract detail renders archived signing reference.');
+$deliveryEmail = $tag . '.delivery@example.test';
+$deliveryId = $identity->addUser($admin, '测试工作台实施', $deliveryEmail, $password);
+$identity->membership($admin, $a, $deliveryId, 'delivery', true);
+$delivery = new Access($db, $deliveryId);
+$ops = new Operations($db);
+$opened = $ops->execute($actor, $a, 'handover.open', 'handover-' . $tag, [
+    'agreement_id' => $agreement['id'], 'agreement_version' => 1, 'agreement_revision' => 1, 'owner_id' => $deliveryId,
+    'contact_id' => $contact['id'], 'scope' => '维护服务培训与文档交付',
+])['result'];
+$work = ['id' => $opened['id']];
+$ops->execute($actor, $a, 'handover.confirm', 'sales-scope-' . $tag, $work + ['version' => 1, 'side' => 'sales']);
+$ops->execute($delivery, $a, 'handover.confirm', 'delivery-scope-' . $tag, $work + ['version' => 2, 'side' => 'delivery']);
+$milestone = $ops->execute($delivery, $a, 'handover.milestone.add', 'add-milestone-' . $tag,
+    $work + ['version' => 3, 'title' => '客户资料交接', 'due_on' => $tomorrow])['result'];
+$ops->execute($delivery, $a, 'handover.milestone.complete', 'complete-milestone-' . $tag,
+    $work + ['version' => 4, 'milestone_id' => $milestone['milestone_id']]);
+$deliveryClient = new WorkbenchClient($base);
+$deliveryClient->login($deliveryEmail, $password);
+$handoverPath = '/?company=' . $a . '&view=handovers&id=' . $work['id'];
+same(true, str_contains($deliveryClient->call($handoverPath)['body'], 'enctype="multipart/form-data"'), 'Assigned implementer sees real attachment form.');
+$confirmationAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s.u\Z');
+$fileBytes = "Sample signed handover receipt.\r\n";
+$uploaded = $deliveryClient->upload($handoverPath, [
+    'action' => 'handover.accept', 'csrf' => $deliveryClient->csrf, 'request_key' => 'accept-upload-' . $tag,
+    'data[id]' => $work['id'], 'data[version]' => 5, 'data[agreement_revision]' => 1, 'data[contact_id]' => $contact['id'],
+    'data[confirmed_at]' => $confirmationAt, 'data[evidence_reference]' => 'CUSTOMER-HTTP-ACCEPT',
+], 'signed-handover.txt', $fileBytes);
+same(303, $uploaded['code'], 'Multipart browser upload preserves the signed handover evidence.');
+same(true, str_contains($deliveryClient->call($handoverPath)['body'], '下载 signed-handover.txt'), 'Accepted workbench record exposes the attachment link.');
+$download = $deliveryClient->call('/download.php?company=' . $a . '&handover=' . $work['id']);
+same(200, $download['code'], 'Assigned implementer can download their evidence.');
+same($fileBytes, $download['body'], 'Download returns exactly the uploaded bytes.');
+same(true, in_array('Content-Digest: sha-256=:' . base64_encode(hash('sha256', $fileBytes, true)) . ':', $download['headers'], true),
+    'Response carries digest of archived evidence.');
+same(404, $client->call('/download.php?company=' . $b . '&handover=' . $work['id'])['code'], 'Evidence HTTP route denies cross-company download.');
 $identity->membership($admin, $a, $seller, 'sales', false);
 same(401, $client->call('/api.php?resource=accounts&company=' . $a)['code'], 'Existing browser session expires after role revocation.');
 done('HTTP workbench, cookies, request recovery and CSV');

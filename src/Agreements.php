@@ -70,7 +70,7 @@ final class Agreements
     public function propose(Access $actor, int $company, int $id, int $version, array $data): array
     {
         return $this->db->transaction(function () use ($actor, $company, $id, $version, $data): array {
-            $contract = $this->sellerLock($actor, $company, $id);
+            $contract = $this->forSalesUpdate($actor, $company, $id);
             Accounts::checkVersion($contract, $version);
             $latest = $this->assertCanChange($contract);
             $active = $this->revision($company, $id, $contract['active_revision']);
@@ -125,7 +125,7 @@ final class Agreements
         $state = Input::choice($state, '合同状态', array_keys(self::PROGRESSION));
         $reason = Input::text($reason, '合同状态变更原因', 400);
         return $this->db->transaction(function () use ($actor, $company, $id, $version, $state, $reason): array {
-            $contract = $this->sellerLock($actor, $company, $id);
+            $contract = $this->forSalesUpdate($actor, $company, $id);
             Accounts::checkVersion($contract, $version);
             $this->assertCanChange($contract);
             if (!in_array($state, self::PROGRESSION[$contract['state']], true)) {
@@ -182,6 +182,10 @@ final class Agreements
             'SELECT revision,based_on,decision,currency,value_minor,ends_on,decided_at FROM agreement_versions
              WHERE company_id = ? AND agreement_id = ? ORDER BY revision DESC LIMIT 100', [$company, $id],
         ) : [];
+        $contract['handover'] = $full ? $this->db->row(
+            'SELECT id,state FROM handovers WHERE company_id = ? AND agreement_id = ? AND agreement_revision = ?',
+            [$company, $id, $revision['revision']],
+        ) : null;
         $contract['timeline'] = $full ? $this->audit->timeline($company, 'agreement', $id, $after) : [];
         return $contract + $revision;
     }
@@ -257,11 +261,11 @@ final class Agreements
             'terms' => Input::text($input['terms'] ?? null, '合同条款', 2000)];
     }
 
-    private function sellerLock(Access $actor, int $company, int $id): array
+    public function forSalesUpdate(Access $actor, int $company, int $id): array
     {
         $actor->allow($company, 'manager', 'sales');
         $existing = $this->row($company, $id);
-        $this->accounts->writable($actor, $company, $existing['account_id']);
+        $this->accounts->writable($actor, $company, $existing['account_id'], historical: true);
         $contract = $this->row($company, $id, true);
         if (!$actor->has($company, 'manager') && $actor->userId !== (int) $contract['owner_id']) {
             throw new BusinessError('合同分配给其他销售。', 403);

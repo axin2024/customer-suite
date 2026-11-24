@@ -19,6 +19,8 @@ $columns = match ($view) {
         'net_minor' => '报价实收', 'discount_bps' => '折扣', 'expires_on' => '有效至（UTC）'],
     'agreements' => ['id' => '编号', 'reference_no' => '合同编号', 'legal_name' => '签约客户', 'state' => '状态',
         'currency' => '币种', 'value_minor' => '金额', 'ends_on' => '合同到期', 'service_level' => '服务级别'],
+    'handovers' => ['id' => '编号', 'reference_no' => '合同编号', 'legal_name' => '签约客户', 'agreement_revision' => '合同版本',
+        'state' => '状态', 'owner_id' => '交付负责人', 'version' => '交接工作单版本'],
 };
 $renderValue = static function (array $row, string $col) use ($stateNames): string|int {
     $value = $row[$col] ?? null;
@@ -70,7 +72,7 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
     <?php endif; ?>
     <section class="panel table-panel">
         <?php $rowsTable($result['items'], $columns, match ($view) {
-            'opportunities', 'quotes' => 'title', 'forecasts' => 'label', 'agreements' => 'reference_no', default => 'name',
+            'opportunities', 'quotes' => 'title', 'forecasts' => 'label', 'agreements', 'handovers' => 'reference_no', default => 'name',
         }); ?>
     </section>
     <?php if ($result['next_cursor'] ?? null): ?>
@@ -124,6 +126,9 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
     <?php endif; ?>
     <?php if (in_array($view, ['quotes', 'agreements'], true)): ?>
         <?php require __DIR__ . '/contract-record.php'; ?>
+    <?php endif; ?>
+    <?php if ($view === 'handovers'): ?>
+        <?php require __DIR__ . '/handover-record.php'; ?>
     <?php endif; ?>
     <?php if ($view === 'forecasts'): ?>
         <section class="panel table-panel"><h2>币种汇总</h2>

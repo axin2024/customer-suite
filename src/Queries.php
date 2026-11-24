@@ -41,6 +41,9 @@ final class Queries
             'agreements' => $id === null
                 ? (new Agreements($this->db))->list($actor, $company, Input::text($query['state'] ?? 'signed', '合同状态', 20), $cursor)
                 : (new Agreements($this->db))->detail($actor, $company, $id, $after, isset($query['revision']) ? Input::id($query['revision']) : null),
+            'handovers' => $id === null
+                ? (new Handovers($this->db))->list($actor, $company, Input::text($query['state'] ?? 'executing', '交接状态', 20), $cursor)
+                : (new Handovers($this->db))->detail($actor, $company, $id, $after),
             'receipts' => (new Receipts($this->db))->read($actor, $company, Input::key($query['key'] ?? null, '请求标识', 128)),
             default => throw new BusinessError('未找到资源。', 404),
         };

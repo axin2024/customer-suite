@@ -76,17 +76,33 @@ final class Accounts
         ));
     }
 
-    public function writable(Access $actor, int $companyId, int $id): array
+    public function writable(Access $actor, int $companyId, int $id, bool $historical = false): array
     {
         $actor->allow($companyId, 'manager', 'sales');
         $row = $this->account($companyId, $id, true);
         if (!$actor->has($companyId, 'manager') && (int) $row['owner_id'] !== $actor->userId) {
             throw new BusinessError('该客户已分配给其他负责人。', 403);
         }
-        if ($row['state'] === 'merged') {
+        if ($row['state'] === 'merged' && !$historical) {
             throw new BusinessError('客户已归并，请打开当前主档。', 409, ['merged_into_id' => (int) $row['merged_into_id']]);
         }
         return $row;
+    }
+
+    public function currentId(int $company, int $id): int
+    {
+        $seen = [];
+        while (true) {
+            if (isset($seen[$id])) {
+                throw new \LogicException('Customer merge links contain a cycle.');
+            }
+            $seen[$id] = true;
+            $row = $this->account($company, $id);
+            if ($row['merged_into_id'] === null) {
+                return $id;
+            }
+            $id = (int) $row['merged_into_id'];
+        }
     }
 
     public function revise(Access $actor, int $companyId, int $id, int $version, ?int $owner, ?string $state): array

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CustomerSuite\BusinessError;
 use CustomerSuite\Database;
+use CustomerSuite\Evidence;
 use CustomerSuite\Input;
 use CustomerSuite\Operations;
 use CustomerSuite\Queries;
@@ -32,9 +33,13 @@ try {
         if ($type !== 'application/json') {
             throw new BusinessError('请求正文须为 JSON。', 415);
         }
-        $raw = file_get_contents('php://input', false, null, 0, 262145);
-        if ($raw === false || strlen($raw) > 262144) {
-            throw new BusinessError('请求正文不能超过 256 KiB。', 413);
+        if ($resource !== 'session' && $actor === null) {
+            throw new BusinessError('请先登录。', 401);
+        }
+        $maxBytes = $resource === 'session' ? 262144 : Evidence::MAX_ENCODED_BYTES + 65536;
+        $raw = file_get_contents('php://input', false, null, 0, $maxBytes + 1);
+        if ($raw === false || strlen($raw) > $maxBytes) {
+            throw new BusinessError('请求正文超过大小限制。', 413);
         }
         $payload = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
         if (!is_array($payload) || array_is_list($payload)) {
@@ -43,9 +48,6 @@ try {
         if ($resource === 'session') {
             $session->login($payload['email'] ?? null, $payload['password'] ?? null, $_SERVER['REMOTE_ADDR'] ?? '');
             WebResponse::json(['csrf' => $session->csrf(), 'user' => $session->actor()->user()]);
-        }
-        if ($actor === null) {
-            throw new BusinessError('请先登录。', 401);
         }
         $company = Input::id($_GET['company'] ?? null, '公司编号');
         $action = Input::key($payload['action'] ?? null, '操作', 64);

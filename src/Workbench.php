@@ -14,6 +14,7 @@ final class Workbench
         'forecasts' => ['预测快照', '保存按币种汇总的时点预测', ['manager']],
         'quotes' => ['报价与审批', '比较报价修订，提交折扣审批并登记签约', ['manager', 'sales', 'approver']],
         'agreements' => ['合同台账', '按签约公司查看合同正本及补充协议', ['manager', 'sales', 'approver']],
+        'handovers' => ['交付交接', '确认范围与客户代表，办理里程碑和验收', ['manager', 'sales', 'delivery']],
     ];
     public const STATES = [
         'active' => '正常', 'frozen' => '冻结', 'merged' => '已归并',
@@ -22,6 +23,8 @@ final class Workbench
         'draft' => '草拟', 'pending' => '待审批', 'approved' => '已批准', 'rejected' => '已拒绝', 'contracted' => '已转合同',
         'archived' => '历史修订', 'signed' => '已签署', 'fulfilling' => '履约中', 'renewing' => '续约中', 'ended' => '已终止',
         'automatic' => '授权范围内通过',
+        'planning' => '待确认范围', 'executing' => '交付中', 'accepted' => '已验收',
+        'scheduled' => '已排期', 'delayed' => '延期', 'completed' => '已完成',
     ];
     public const FILTERS = [
         'accounts' => ['active', 'frozen', 'merged'],
@@ -29,6 +32,7 @@ final class Workbench
         'opportunities' => ['discovery', 'qualified', 'proposal', 'negotiation', 'won', 'lost'],
         'quotes' => ['pending', 'draft', 'approved', 'rejected', 'contracted'],
         'agreements' => ['signed', 'fulfilling', 'renewing', 'ended'],
+        'handovers' => ['executing', 'planning', 'accepted'],
     ];
 
     public function __construct(private readonly Database $db)

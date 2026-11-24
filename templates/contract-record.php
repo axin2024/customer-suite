@@ -65,7 +65,16 @@ $idVersion = ['id' => $result['id'], 'version' => $result['version']];
         <?php $rowsTable([$result], ['legal_registration_ref' => '登记号', 'decision' => '本版状态', 'starts_on' => '生效日期',
             'based_on' => '依据版本', 'evidence_ref' => '签署凭据', 'change_reason' => '变更原因', 'decision_reason' => '复核依据']); ?>
     </section>
-    <?php if ($result['can_change'] && $result['latest_decision'] !== 'pending' && $result['state'] !== 'ended'): ?>
+    <?php if ($result['handover'] !== null): ?>
+        <a class="pager" href="<?= e(url(['company' => $chosen, 'view' => 'handovers', 'id' => $result['handover']['id']])) ?>">查看该版本的交付工作单</a>
+    <?php elseif ($result['can_change'] && $result['revision'] === $result['active_revision'] && $result['state'] !== 'ended'): ?>
+        <?php formPanel('发起交付交接', $csrf, 'handover.open', '建立交接工作单', static function (): void {
+            field('owner_id', '实施人员编号', 'number');
+            field('contact_id', '签约客户的联系人编号', 'number');
+            field('scope', '交付范围');
+        }, ['agreement_id' => $result['id'], 'agreement_version' => $result['version'], 'agreement_revision' => $result['revision']]); ?>
+    <?php endif; ?>
+    <?php if ($result['can_change'] && $result['revision'] === $result['active_revision'] && $result['latest_decision'] !== 'pending' && $result['state'] !== 'ended'): ?>
         <?php formPanel('新增补充协议', $csrf, 'agreement.propose', '提交复核', static function () use ($result): void {
             field('amount', '新合同金额（' . $result['currency'] . '）', 'text', true, Money::format($result['value_minor'], $result['currency']));
             field('starts_on', '新生效日期', 'date', true, $result['starts_on']);

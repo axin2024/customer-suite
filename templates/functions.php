@@ -39,9 +39,10 @@ function selectField(string $name, string $label, array $options, bool $required
     echo '</select></label>';
 }
 
-function operation(string $csrf, string $action, string $button, callable $fields, array $hidden = []): void
+function operation(string $csrf, string $action, string $button, callable $fields, array $hidden = [], bool $attachment = false): void
 {
-    echo '<form method="post" class="operation"><input type="hidden" name="csrf" value="', e($csrf), '">',
+    echo '<form method="post" class="operation"', $attachment ? ' enctype="multipart/form-data"' : '',
+        '><input type="hidden" name="csrf" value="', e($csrf), '">',
         '<input type="hidden" name="action" value="', e($action), '">',
         '<input type="hidden" name="request_key" value="', e(bin2hex(random_bytes(16))), '">';
     foreach ($hidden as $name => $value) {
@@ -52,9 +53,9 @@ function operation(string $csrf, string $action, string $button, callable $field
     echo '</div><button class="primary" type="submit">', e($button), '</button></form>';
 }
 
-function formPanel(string $title, string $csrf, string $action, string $button, callable $fields, array $hidden = []): void
+function formPanel(string $title, string $csrf, string $action, string $button, callable $fields, array $hidden = [], bool $attachment = false): void
 {
     echo '<details class="panel form-panel"><summary>', e($title), '</summary>';
-    operation($csrf, $action, $button, $fields, $hidden);
+    operation($csrf, $action, $button, $fields, $hidden, $attachment);
     echo '</details>';
 }

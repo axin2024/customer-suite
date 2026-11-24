@@ -31,6 +31,16 @@ final class Operations
         'agreement.propose' => ['id:i', 'version:i', 'amount', 'starts_on', 'ends_on', 'service_level', 'terms', 'reason'],
         'agreement.decide' => ['id:i', 'version:i', 'decision', 'reason', 'evidence_ref?'],
         'agreement.move' => ['id:i', 'version:i', 'state', 'reason'],
+        'handover.open' => ['agreement_id:i', 'agreement_version:i', 'agreement_revision:i', 'owner_id:i', 'contact_id:i', 'scope'],
+        'handover.revise' => ['id:i', 'version:i', 'contact_id:i', 'scope'],
+        'handover.confirm' => ['id:i', 'version:i', 'side'],
+        'handover.assign' => ['id:i', 'version:i', 'owner_id:i', 'reason'],
+        'handover.milestone.add' => ['id:i', 'version:i', 'title', 'due_on'],
+        'handover.milestone.delay' => ['id:i', 'version:i', 'milestone_id:i', 'due_on', 'impact', 'pending_item'],
+        'handover.milestone.complete' => ['id:i', 'version:i', 'milestone_id:i'],
+        'handover.issue.add' => ['id:i', 'version:i', 'title'],
+        'handover.issue.resolve' => ['id:i', 'version:i', 'issue_id:i', 'resolution'],
+        'handover.accept' => ['id:i', 'version:i', 'agreement_revision:i', 'contact_id:i', 'confirmed_at', 'evidence_reference', 'file_name', 'file_base64:f'],
     ];
 
     public function __construct(private readonly Database $db)
@@ -80,6 +90,13 @@ final class Operations
             'agreement.propose' => (new Agreements($this->db))->propose($actor, $companyId, $data['id'], $data['version'], $data),
             'agreement.decide' => (new Agreements($this->db))->decide($actor, $companyId, $data['id'], $data['version'], $data),
             'agreement.move' => (new Agreements($this->db))->move($actor, $companyId, $data['id'], $data['version'], $data['state'], $data['reason']),
+            'handover.open' => (new Handovers($this->db))->open($actor, $companyId, $data),
+            'handover.revise' => (new Handovers($this->db))->revise($actor, $companyId, $data['id'], $data['version'], $data),
+            'handover.confirm' => (new Handovers($this->db))->confirm($actor, $companyId, $data['id'], $data['version'], $data['side']),
+            'handover.assign' => (new Handovers($this->db))->assign($actor, $companyId, $data['id'], $data['version'], $data['owner_id'], $data['reason']),
+            'handover.milestone.add', 'handover.milestone.delay', 'handover.milestone.complete', 'handover.issue.add', 'handover.issue.resolve' =>
+                (new Handovers($this->db))->updateDelivery($actor, $companyId, $data['id'], $data['version'], $action, $data),
+            'handover.accept' => (new Handovers($this->db))->accept($actor, $companyId, $data['id'], $data['version'], $data),
         };
     }
 
@@ -98,6 +115,7 @@ final class Operations
             $data[$name] = match ($type) {
                 'i' => Input::id($value, $name),
                 'n' => Input::integer($value, $name, 0, 10000),
+                'f' => Evidence::encoded($value),
                 'b' => match ($value) {
                     true, '1' => true,
                     false, '0' => false,
