@@ -61,6 +61,11 @@ final class Queries
                 : (new Renewals($this->db))->detail($actor, $company, $id, $after),
             'outreach' => ['items' => (new Outreach($this->db))->related($actor, $company,
                 $id ?? throw new BusinessError('须指定续约编号。'), $after)],
+            'reports' => $id === null
+                ? ['items' => (new Reports($this->db))->list($actor, $company,
+                    isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX)]
+                : (new Reports($this->db))->detail($actor, $company, $id, $query),
+            'report-rates' => ['items' => (new ReportRates($this->db))->list($actor, $company)],
             default => throw new BusinessError('未找到资源。', 404),
         };
     }

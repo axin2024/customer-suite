@@ -32,8 +32,9 @@ docker compose exec -T -e CRM_ADMIN_PASSWORD web php bin/crm.php init-admin admi
 | 交付交接 | 双岗位确认范围、变更客户代表与实施人员、跟踪延期和待确认事项、上传并核验合同版本的签收附件 |
 | 服务台 | 按合同授权、分类派发、并行响应和解决时钟、等待客户暂停、到期升级与资格复核 |
 | 客户成功 | 合同负责人、可解释健康度快照、唯一续约商机、流失原因、触达队列与授权复核 |
+| 经营分析 | 历史阶段与转化漏斗、首次和最近渠道归因、按汇率版本折算、多公司下钻与授权 CSV |
 
-[报价、签约与交付](docs/sales-delivery.md) · [服务台与 SLA](docs/service-desk.md) · [客户成功与续约](docs/customer-success.md)
+[报价、签约与交付](docs/sales-delivery.md) · [服务台与 SLA](docs/service-desk.md) · [客户成功与续约](docs/customer-success.md) · [经营分析](docs/management-reports.md)
 
 ## 兼容与验收
 

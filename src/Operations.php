@@ -60,6 +60,8 @@ final class Operations
         'outreach.queue' => ['id:i', 'version:i', 'contact_id:i', 'channel', 'message'],
         'outreach.process' => ['id:i', 'version:i'],
         'outreach.cancel' => ['id:i', 'version:i', 'reason'],
+        'report.fx' => ['rate_date', 'source', 'rates:j'],
+        'report.capture' => ['label', 'as_of?', 'cohort_start?', 'fx_set_id:i', 'company_ids:j?'],
     ];
 
     public function __construct(private readonly Database $db)
@@ -135,6 +137,8 @@ final class Operations
             'outreach.queue' => (new Outreach($this->db))->queue($actor, $companyId, $data),
             'outreach.process' => (new Outreach($this->db))->process($actor, $companyId, $data),
             'outreach.cancel' => (new Outreach($this->db))->cancel($actor, $companyId, $data),
+            'report.fx' => (new ReportRates($this->db))->create($actor, $companyId, $data),
+            'report.capture' => (new ReportCapture($this->db))->capture($actor, $companyId, $data),
         };
     }
 

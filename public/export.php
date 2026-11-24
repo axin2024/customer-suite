@@ -6,6 +6,8 @@ use CustomerSuite\BusinessError;
 use CustomerSuite\Contacts;
 use CustomerSuite\Database;
 use CustomerSuite\Input;
+use CustomerSuite\Reports;
+use CustomerSuite\SpreadsheetCsv;
 use CustomerSuite\WebResponse;
 use CustomerSuite\WebSession;
 
@@ -22,21 +24,19 @@ try {
     $actor = $session->actor() ?? throw new BusinessError('请先登录。', 401);
     session_write_close();
     $company = Input::id($_GET['company'] ?? null, '公司');
+    if (isset($_GET['report'])) {
+        $id = Input::id($_GET['report'], '报表');
+        $rows = (new Reports($db))->export($actor, $company, $id, $_GET);
+        SpreadsheetCsv::send('report-' . $id . '.csv', [
+            '公司编号', '公司', '种类', '业务编号', '标题', '客户编号', '业务版本', '阶段', '阶段事件号', '最深阶段',
+            '金额版本', '币种', '原币最小单位', '汇率', '人民币分', '首次触点号', '首次渠道', '最近触点号', '最近渠道',
+        ], $rows);
+        exit;
+    }
     $account = Input::id($_GET['account'] ?? null, '客户');
     $channel = Input::choice($_GET['channel'] ?? null, '渠道', ['email', 'phone']);
     $rows = (new Contacts($db))->directory($actor, $company, $account, $channel);
-    header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="contacts-' . $account . '-' . $channel . '.csv"');
-    $out = fopen('php://output', 'wb');
-    fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['联系人编号', '姓名', '职位', $channel], ',', '"', '');
-    foreach ($rows as $row) {
-        $cells = array_map(static function (int|string $value): string {
-            return preg_match('/^\s*[=+\-@]/u', (string) $value) ? "'" . $value : (string) $value;
-        }, array_values($row));
-        fputcsv($out, $cells, ',', '"', '');
-    }
-    fclose($out);
+    SpreadsheetCsv::send('contacts-' . $account . '-' . $channel . '.csv', ['联系人编号', '姓名', '职位', $channel], $rows);
 } catch (BusinessError $error) {
     WebResponse::json(['error' => $error->getMessage()], $error->status);
 } catch (Throwable $error) {

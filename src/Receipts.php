@@ -67,6 +67,10 @@ final class Receipts
             (new SuccessContracts($this->db))->readable($actor, $company, (int) $result['agreement_id']);
         } elseif (str_starts_with($action, 'outreach.')) {
             (new Renewals($this->db))->readable($actor, $company, (int) $result['renewal_id']);
+        } elseif ($action === 'report.capture') {
+            (new Reports($this->db))->assertReceipt($actor, $company, (int) $result['id']);
+        } elseif ($action === 'report.fx') {
+            $actor->allow($company, 'manager');
         }
     }
 

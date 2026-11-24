@@ -117,6 +117,16 @@ try {
                 }
                 $result['snapshot'] = $snapshot;
             }
+            if ($view === 'reports' && !isset($query['id']) && $actor->has($chosen, 'manager')) {
+                $result['fx_sets'] = (new Queries($db))->read($actor, $chosen, 'report-rates', [])['items'];
+                $result['eligible_companies'] = [];
+                foreach ($companies as $eligible) {
+                    if (($eligible['id'] === $chosen || $eligible['parent_id'] === $chosen)
+                        && $actor->has($eligible['id'], 'manager')) {
+                        $result['eligible_companies'][$eligible['id']] = $eligible['name'];
+                    }
+                }
+            }
         }
     }
 } catch (BusinessError $failure) {

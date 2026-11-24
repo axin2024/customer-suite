@@ -19,6 +19,7 @@ final class Workbench
         'service-settings' => ['服务设置', '配置队列、合同授权与工作日历', ['manager']],
         'success-contracts' => ['客户成功', '跟踪负责合同的健康度与续约周期', ['manager', 'success']],
         'renewals' => ['续约工作台', '扫描到期合同、登记跟进与触达结果', ['manager', 'success']],
+        'reports' => ['经营分析', '按组织和时间追踪成交漏斗、渠道贡献与签约金额', ['manager', 'sales']],
     ];
     public const STATES = [
         'active' => '正常', 'frozen' => '冻结', 'merged' => '已归并',

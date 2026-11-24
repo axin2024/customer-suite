@@ -315,7 +315,31 @@ same(303, $queued['code'], 'Outreach form records requested intent.');
 same(true, str_contains($successClient->call($renewalPath)['body'], '该渠道缺少客户成功触达授权'), 'Consent rejection is persisted and visible.');
 same(404, $serviceClient->call($renewalPath)['code'], 'Service-only role cannot access customer success details.');
 
+$branch = $identity->addCompany($admin, 'R-HTTP-' . $tag, '报表子公司独立数据', $a);
+$branchAccount = $accounts->create($admin, $branch, ['name' => '子公司独立数据客户']);
+$opportunities->create($admin, $branch, ['account_id' => $branchAccount['id'], 'title' => '绝不出现在旧公司 CSV',
+    'currency' => 'CNY', 'amount' => '2500', 'expected_close' => $nextMonth]);
+$reportsPath = '/?company=' . $a . '&view=reports';
+same(true, str_contains($client->call($reportsPath)['body'], 'value="report.fx"'), 'Manager can register the rate book in the workbench.');
+$rateResponse = $client->json($api, ['action' => 'report.fx',
+    'data' => ['rate_date' => gmdate('Y-m-d'), 'source' => '合成汇率', 'rates' => []]], 'rates-' . $tag);
+same(200, $rateResponse['code'], 'Rate version created through HTTP.');
+$rate = json_decode($rateResponse['body'], true, 16, JSON_THROW_ON_ERROR)['result'];
+$report = $ops->execute($admin, $a, 'report.capture', 'report-' . $tag,
+    ['label' => '总部报告', 'fx_set_id' => $rate['id'], 'company_ids' => [$a, $branch]])['result'];
+$reportPath = $reportsPath . '&id=' . $report['id'];
+$csvPath = '/export.php?company=' . $a . '&report=' . $report['id'];
+same(true, str_contains($client->call($reportPath)['body'], '导出当前范围 CSV'), 'Report page links the scoped CSV.');
+same(false, str_contains($client->call($reportPath)['body'], '绝不出现在旧公司 CSV'), 'Manager with no subsidiary role does not see its report row.');
+same(404, $client->call($csvPath . '&scope_company=' . $branch)['code'], 'Unauthorized branch filter returns no CSV file.');
 $identity->membership($admin, $a, $seller, 'manager', false);
+$client->login($email, $password);
+$sellerCsv = $client->call($csvPath . '&kind=agreement');
+same(200, $sellerCsv['code'], 'Sales can download a scoped historical contract report.');
+same(true, str_contains($sellerCsv['body'], 'SIGNED-' . $tag), 'CSV contains the legal contract owned by this seller.');
+same(false, str_contains($sellerCsv['body'], '绝不出现在旧公司 CSV'), 'Sales CSV does not export sibling objects.');
+same(false, str_contains($sellerCsv['body'], '设备维护报价'), 'Record-kind filter restricts the CSV to contracts.');
+same(false, str_contains($client->call($reportPath)['body'], '总部报告'), 'Branch-only readers see a generic snapshot title.');
 $identity->membership($admin, $a, $seller, 'sales', false);
 same(401, $client->call('/api.php?resource=accounts&company=' . $a)['code'], 'Existing browser session expires after role revocation.');
 done('HTTP workbench, cookies, request recovery and CSV');

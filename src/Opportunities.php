@@ -64,6 +64,7 @@ final class Opportunities
              VALUES (?,?,?,?,?,?,?,?)', [$company, $account, $owner, $lead, $title, $currency, $amount, $close],
         );
         $this->history($actor, $company, $id, 1, null, 'discovery', self::WEIGHTS['discovery'], null);
+        $this->recordAmount($company, $id, 1, $amount);
         $this->audit->record($actor, $company, 'opportunity', $id, 1, 'opportunity.create', ['account_id' => $account, 'lead_id' => $lead]);
         return $id;
     }
@@ -87,6 +88,7 @@ final class Opportunities
                 'UPDATE opportunities SET value_minor = ?,version = version + 1 WHERE company_id = ? AND id = ?',
                 [$lines['total'], $company, $id],
             );
+            $this->recordAmount($company, $id, $version + 1, $lines['total']);
             $this->audit->record($actor, $company, 'opportunity', $id, $version + 1, 'opportunity.products',
                 ['line_count' => count($lines['items']), 'value_minor' => $lines['total']]);
             return ['id' => $id, 'version' => $version + 1, 'value_minor' => $lines['total']];
@@ -213,6 +215,14 @@ final class Opportunities
         $this->db->run(
             'INSERT INTO stage_history (company_id,opportunity_id,actor_id,from_stage,to_stage,opportunity_version,probability_bps,reason)
              VALUES (?,?,?,?,?,?,?,?)', [$company, $id, $actor->userId, $from, $to, $version, $probability, $reason],
+        );
+    }
+
+    private function recordAmount(int $company, int $id, int $version, int $amount): void
+    {
+        $this->db->run(
+            'INSERT INTO opportunity_amount_history (company_id,opportunity_id,opportunity_version,value_minor) VALUES (?,?,?,?)',
+            [$company, $id, $version, $amount],
         );
     }
 
