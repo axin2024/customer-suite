@@ -32,6 +32,7 @@ jobs:
             php bin/crm.php migrate
             php tests/accounts-marketing.php
             php tests/sales.php
+            php tests/agreements.php
             php -S 127.0.0.1:8081 -t public >/tmp/crm-http.log 2>&1 &
             export CRM_TEST_URL=http://127.0.0.1:8081
             for attempt in 1 2 3 4 5; do

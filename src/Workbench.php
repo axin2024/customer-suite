@@ -12,16 +12,23 @@ final class Workbench
         'leads' => ['线索分配', '查看触点归因、认领和资格确认', ['manager', 'marketing', 'sales']],
         'opportunities' => ['商机管道', '按阶段管理跟进、产品和近期成交', ['manager', 'sales']],
         'forecasts' => ['预测快照', '保存按币种汇总的时点预测', ['manager']],
+        'quotes' => ['报价与审批', '比较报价修订，提交折扣审批并登记签约', ['manager', 'sales', 'approver']],
+        'agreements' => ['合同台账', '按签约公司查看合同正本及补充协议', ['manager', 'sales', 'approver']],
     ];
     public const STATES = [
         'active' => '正常', 'frozen' => '冻结', 'merged' => '已归并',
         'open' => '待认领', 'assigned' => '已分配', 'qualified' => '已确认资格', 'converted' => '已转化', 'closed' => '已关闭',
         'discovery' => '初步接洽', 'proposal' => '报价准备', 'negotiation' => '谈判', 'won' => '赢单', 'lost' => '流失',
+        'draft' => '草拟', 'pending' => '待审批', 'approved' => '已批准', 'rejected' => '已拒绝', 'contracted' => '已转合同',
+        'archived' => '历史修订', 'signed' => '已签署', 'fulfilling' => '履约中', 'renewing' => '续约中', 'ended' => '已终止',
+        'automatic' => '授权范围内通过',
     ];
     public const FILTERS = [
         'accounts' => ['active', 'frozen', 'merged'],
         'leads' => ['open', 'assigned', 'qualified', 'converted', 'closed'],
         'opportunities' => ['discovery', 'qualified', 'proposal', 'negotiation', 'won', 'lost'],
+        'quotes' => ['pending', 'draft', 'approved', 'rejected', 'contracted'],
+        'agreements' => ['signed', 'fulfilling', 'renewing', 'ended'],
     ];
 
     public function __construct(private readonly Database $db)

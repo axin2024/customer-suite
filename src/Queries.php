@@ -35,6 +35,12 @@ final class Queries
                 : (new Forecasts($this->db))->detail($actor, $company, $id, $after),
             'forecast-diff' => (new Forecasts($this->db))->compare($actor, $company,
                 $id ?? throw new BusinessError('须指定原快照。'), Input::id($query['to'] ?? null, '新快照'), $after),
+            'quotes' => $id === null
+                ? (new Quotes($this->db))->list($actor, $company, Input::text($query['state'] ?? 'pending', '报价状态', 20), $cursor)
+                : (new Quotes($this->db))->detail($actor, $company, $id, $after, isset($query['revision']) ? Input::id($query['revision']) : null),
+            'agreements' => $id === null
+                ? (new Agreements($this->db))->list($actor, $company, Input::text($query['state'] ?? 'signed', '合同状态', 20), $cursor)
+                : (new Agreements($this->db))->detail($actor, $company, $id, $after, isset($query['revision']) ? Input::id($query['revision']) : null),
             'receipts' => (new Receipts($this->db))->read($actor, $company, Input::key($query['key'] ?? null, '请求标识', 128)),
             default => throw new BusinessError('未找到资源。', 404),
         };

@@ -65,6 +65,17 @@ final class Input
         return $id;
     }
 
+    public static function integer(mixed $value, string $label, int $min, int $max): int
+    {
+        if (is_string($value) && preg_match('/^(0|[1-9][0-9]*)$/D', $value)) {
+            $value = filter_var($value, FILTER_VALIDATE_INT);
+        }
+        if (!is_int($value) || $value < $min || $value > $max) {
+            throw new BusinessError($label . '须为 ' . $min . ' 至 ' . $max . ' 的整数。');
+        }
+        return $value;
+    }
+
     public static function key(mixed $value, string $label, int $max): string
     {
         $value = self::text($value, $label, $max);

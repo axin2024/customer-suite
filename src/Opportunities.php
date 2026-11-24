@@ -142,6 +142,7 @@ final class Opportunities
             throw new BusinessError('未找到商机。', 404);
         }
         $row['products'] = $this->lines($company, $id);
+        $row['quote'] = $this->db->row('SELECT id,state,version FROM quotes WHERE company_id = ? AND opportunity_id = ?', [$company, $id]);
         $row['stages'] = $this->db->rows(
             'SELECT * FROM stage_history WHERE company_id = ? AND opportunity_id = ? AND id > ? ORDER BY id LIMIT 100',
             [$company, $id, $after],

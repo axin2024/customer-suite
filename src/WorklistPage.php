@@ -25,9 +25,10 @@ final class WorklistPage
         return new self($updatedAt, Input::id($pieces[2]));
     }
 
-    public function clause(): string
+    public function clause(string $alias = ''): string
     {
-        return $this->id === null ? '' : ' AND (updated_at < ? OR (updated_at = ? AND id < ?))';
+        $prefix = $alias === '' ? '' : $alias . '.';
+        return $this->id === null ? '' : " AND ({$prefix}updated_at < ? OR ({$prefix}updated_at = ? AND {$prefix}id < ?))";
     }
 
     public function parameters(): array

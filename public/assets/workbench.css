@@ -64,8 +64,10 @@ tr:last-child td { border-bottom: 0; }
 summary { font-weight: 700; cursor: pointer; }
 .operation { margin-top: 14px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 12px; }
-.form-grid .full { grid-column: 1 / -1; }
+.form-grid .full, .form-grid .form-wide { grid-column: 1 / -1; }
 .product-row { display: grid; grid-template-columns: 1.1fr .8fr 1.5fr .6fr .9fr auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+.allocation-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); align-items: end; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.allocation-row legend { padding: 0 6px; color: var(--muted); }
 .operation .primary { margin-top: 13px; }
 .primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 650; }
 .primary:hover { background: #07574c; }

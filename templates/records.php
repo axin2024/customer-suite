@@ -15,13 +15,18 @@ $columns = match ($view) {
     'opportunities' => ['id' => '编号', 'title' => '商机', 'stage' => '阶段', 'currency' => '币种', 'value_minor' => '金额',
         'probability_bps' => '胜率', 'expected_close' => '预计成交', 'version' => '版本'],
     'forecasts' => ['id' => '编号', 'label' => '快照', 'period_start' => '预计成交起始日', 'period_end' => '预计成交结束日', 'captured_at' => '创建时间'],
+    'quotes' => ['id' => '编号', 'title' => '对应商机', 'state' => '状态', 'revision' => '修订', 'currency' => '币种',
+        'net_minor' => '报价实收', 'discount_bps' => '折扣', 'expires_on' => '有效至（UTC）'],
+    'agreements' => ['id' => '编号', 'reference_no' => '合同编号', 'legal_name' => '签约客户', 'state' => '状态',
+        'currency' => '币种', 'value_minor' => '金额', 'ends_on' => '合同到期', 'service_level' => '服务级别'],
 };
 $renderValue = static function (array $row, string $col) use ($stateNames): string|int {
     $value = $row[$col] ?? null;
     return match ($col) {
-        'state', 'stage' => $stateNames[$value] ?? ($value ?? '—'),
-        'value_minor', 'weighted_minor' => $value === null ? '—' : Money::format((int) $value, $row['currency']),
-        'probability_bps' => $value === null ? '—' : ($value / 100) . '%',
+        'state', 'stage', 'decision' => $stateNames[$value] ?? ($value ?? '—'),
+        'value_minor', 'weighted_minor', 'net_minor', 'gross_minor' => $value === null ? '—' : Money::format((int) $value, $row['currency']),
+        'probability_bps', 'discount_bps' => $value === null ? '—' : ($value / 100) . '%',
+        'service_level' => \CustomerSuite\Agreements::LEVELS[$value] ?? '—',
         default => $value === null ? '—' : (string) $value,
     };
 };
@@ -64,7 +69,9 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
         </nav>
     <?php endif; ?>
     <section class="panel table-panel">
-        <?php $rowsTable($result['items'], $columns, match ($view) { 'opportunities' => 'title', 'forecasts' => 'label', default => 'name' }); ?>
+        <?php $rowsTable($result['items'], $columns, match ($view) {
+            'opportunities', 'quotes' => 'title', 'forecasts' => 'label', 'agreements' => 'reference_no', default => 'name',
+        }); ?>
     </section>
     <?php if ($result['next_cursor'] ?? null): ?>
         <a class="pager" href="<?= e(url($baseLink + ['state' => $query['state'] ?? null, 'cursor' => $result['next_cursor']])) ?>">下一页</a>
@@ -72,7 +79,7 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
 <?php else: ?>
     <a class="pager" href="<?= e(url($baseLink)) ?>">← 返回列表</a>
     <section class="panel table-panel">
-        <h2><?= e($result['name'] ?? $result['title'] ?? $result['label']) ?></h2>
+        <h2><?= e($result['name'] ?? $result['title'] ?? $result['label'] ?? $result['reference_no']) ?></h2>
         <?php $rowsTable([$result], $columns); ?>
     </section>
     <?php if ($view === 'accounts'): ?>
@@ -106,11 +113,17 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
         </section>
     <?php endif; ?>
     <?php if ($view === 'opportunities'): ?>
+        <?php if ($result['quote'] !== null): ?>
+            <a class="pager" href="<?= e(url(['company' => $chosen, 'view' => 'quotes', 'id' => $result['quote']['id']])) ?>">查看报价和签约</a>
+        <?php endif; ?>
         <section class="panel table-panel"><h2>产品与版本</h2>
             <?php $rowsTable(array_map(static fn (array $line): array => $line + ['unit_price' => Money::format($line['unit_minor'], $result['currency'])],
                 $result['products']), ['product_code' => '产品代码', 'product_version' => '版本', 'description' => '名称',
                 'quantity' => '数量', 'unit_price' => '单价']); ?>
         </section>
+    <?php endif; ?>
+    <?php if (in_array($view, ['quotes', 'agreements'], true)): ?>
+        <?php require __DIR__ . '/contract-record.php'; ?>
     <?php endif; ?>
     <?php if ($view === 'forecasts'): ?>
         <section class="panel table-panel"><h2>币种汇总</h2>

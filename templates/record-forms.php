@@ -118,6 +118,13 @@ if ($view === 'opportunities') {
             require __DIR__ . '/product-rows.php';
         }, $idVersion);
     }
+    if ($detail && $result['quote'] === null && in_array($result['stage'], ['proposal', 'negotiation', 'won'], true)) {
+        formPanel('草拟报价', $csrf, 'quote.prepare', '保存报价草稿', static function (): void {
+            field('discount_bps', '折扣（基点，100 为 1%）', 'text', true, '0');
+            field('expires_on', '报价有效至（UTC）', 'date');
+            field('terms', '报价条款');
+        }, ['opportunity_id' => $result['id'], 'opportunity_version' => $result['version']]);
+    }
 }
 
 if ($view === 'forecasts' && !$detail) {
@@ -125,5 +132,11 @@ if ($view === 'forecasts' && !$detail) {
         field('label', '快照标题');
         field('period_start', '预计成交起始日', 'date');
         field('period_end', '预计成交结束日', 'date');
+    });
+}
+
+if ($view === 'quotes' && !$detail && $manager) {
+    formPanel('设置本公司折扣授权', $csrf, 'quote.policy', '保存折扣规则', static function (): void {
+        field('self_approval_bps', '自行审批折扣上限（基点，100 为 1%）');
     });
 }

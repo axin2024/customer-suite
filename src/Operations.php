@@ -23,6 +23,14 @@ final class Operations
         'opportunity.move' => ['id:i', 'version:i', 'stage', 'decision_contact_id:i?', 'next_follow_up?', 'reason?'],
         'opportunity.products' => ['id:i', 'version:i', 'products:j'],
         'forecast.capture' => ['label', 'period_start', 'period_end'],
+        'quote.policy' => ['self_approval_bps:n'],
+        'quote.prepare' => ['opportunity_id:i', 'opportunity_version:i', 'version:i?', 'discount_bps:n', 'expires_on', 'terms'],
+        'quote.submit' => ['id:i', 'version:i'],
+        'quote.decide' => ['id:i', 'version:i', 'decision', 'reason'],
+        'agreement.sign' => ['id:i', 'version:i', 'scope', 'allocations:j'],
+        'agreement.propose' => ['id:i', 'version:i', 'amount', 'starts_on', 'ends_on', 'service_level', 'terms', 'reason'],
+        'agreement.decide' => ['id:i', 'version:i', 'decision', 'reason', 'evidence_ref?'],
+        'agreement.move' => ['id:i', 'version:i', 'state', 'reason'],
     ];
 
     public function __construct(private readonly Database $db)
@@ -64,6 +72,14 @@ final class Operations
             'opportunity.products' => (new Opportunities($this->db))->updateProducts($actor, $companyId,
                 $data['id'], $data['version'], $data['products']),
             'forecast.capture' => (new Forecasts($this->db))->capture($actor, $companyId, $data),
+            'quote.policy' => (new Quotes($this->db))->setPolicy($actor, $companyId, $data['self_approval_bps']),
+            'quote.prepare' => (new Quotes($this->db))->prepare($actor, $companyId, $data),
+            'quote.submit' => (new Quotes($this->db))->submit($actor, $companyId, $data['id'], $data['version']),
+            'quote.decide' => (new Quotes($this->db))->decide($actor, $companyId, $data['id'], $data['version'], $data['decision'], $data['reason']),
+            'agreement.sign' => (new Agreements($this->db))->sign($actor, $companyId, $data['id'], $data['version'], $data),
+            'agreement.propose' => (new Agreements($this->db))->propose($actor, $companyId, $data['id'], $data['version'], $data),
+            'agreement.decide' => (new Agreements($this->db))->decide($actor, $companyId, $data['id'], $data['version'], $data),
+            'agreement.move' => (new Agreements($this->db))->move($actor, $companyId, $data['id'], $data['version'], $data['state'], $data['reason']),
         };
     }
 
@@ -81,12 +97,13 @@ final class Operations
             }
             $data[$name] = match ($type) {
                 'i' => Input::id($value, $name),
+                'n' => Input::integer($value, $name, 0, 10000),
                 'b' => match ($value) {
                     true, '1' => true,
                     false, '0' => false,
                     default => throw new BusinessError('请选择同意或撤回。'),
                 },
-                'j' => self::structured($value),
+                'j' => self::structured($value, $name),
                 default => Input::text($value, $name, 4096),
             };
         }
@@ -96,15 +113,15 @@ final class Operations
         return $data;
     }
 
-    private static function structured(mixed $input): array
+    private static function structured(mixed $input, string $name): array
     {
         if (is_string($input)) {
             try {
                 $input = json_decode($input, true, 16, JSON_THROW_ON_ERROR);
             } catch (\JsonException) {
-                throw new BusinessError('产品明细须为有效 JSON。');
+                throw new BusinessError($name . ' 须为有效 JSON。');
             }
         }
-        return is_array($input) ? $input : throw new BusinessError('产品明细须为数组。');
+        return is_array($input) ? $input : throw new BusinessError($name . ' 须为数组。');
     }
 }

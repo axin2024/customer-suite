@@ -7,6 +7,7 @@ use CustomerSuite\Accounts;
 use CustomerSuite\Contacts;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
+use CustomerSuite\Opportunities;
 
 require __DIR__ . '/bootstrap.php';
 
@@ -58,6 +59,27 @@ final class WorkbenchClient
         }
         return $this->call($path, 'POST', Input::json($payload), $headers);
     }
+
+    public function sendFormAndDisconnect(string $path, string $body): void
+    {
+        $host = substr($this->base, strlen('http://'));
+        $wire = "POST $path HTTP/1.1\r\nHost: $host\r\nCookie: $this->cookie\r\nConnection: close\r\n"
+            . "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: " . strlen($body) . "\r\n\r\n" . $body;
+        $socket = stream_socket_client('tcp://' . $host, $number, $error, 5);
+        if ($socket === false) {
+            throw new RuntimeException('Could not open loopback socket: ' . $error);
+        }
+        try {
+            for ($sent = 0; $sent < strlen($wire); $sent += $size) {
+                $size = fwrite($socket, substr($wire, $sent));
+                if (!$size) {
+                    throw new RuntimeException('Could not send complete workbench request.');
+                }
+            }
+        } finally {
+            fclose($socket);
+        }
+    }
 }
 
 $base = getenv('CRM_TEST_URL') ?: '';
@@ -105,8 +127,14 @@ $body = http_build_query([
     'action' => 'account.create', 'csrf' => $client->csrf, 'request_key' => $requestKey,
     'data' => ['name' => '回执复查客户'],
 ]);
-$sent = $client->call($path, 'POST', $body, ['Content-Type: application/x-www-form-urlencoded']);
-same(303, $sent['code'], 'Normal workbench form commits and redirects.');
+$client->sendFormAndDisconnect($path, $body);
+for ($attempt = 0; $attempt < 60; $attempt++) {
+    if ($db->row('SELECT 1 FROM operation_receipts WHERE company_id = ? AND actor_id = ? AND request_key = ? AND response IS NOT NULL',
+        [$a, $seller, $requestKey])) {
+        break;
+    }
+    usleep(50000);
+}
 $receipt = $client->call('/api.php?resource=receipts&company=' . $a . '&key=' . $requestKey);
 same(200, $receipt['code'], 'Query by request ID recovers committed result.');
 $id = json_decode($receipt['body'], true, 512, JSON_THROW_ON_ERROR)['result']['id'];
@@ -131,6 +159,43 @@ $contacts->permission($actor, $a, $contactAccount['id'], $contact['id'], 2, arra
 same(false, str_contains($client->call($export)['body'], 'peer@example.test'), 'CSV rechecks consent when generated.');
 same(404, $client->call('/export.php?company=' . $b . '&account=' . $sisterAccount['id'] . '&channel=email')['code'],
     'Contact CSV cannot cross company boundary.');
+
+$opportunities = new Opportunities($db);
+$tomorrow = gmdate('Y-m-d', time() + 86400);
+$nextMonth = gmdate('Y-m-d', time() + 30 * 86400);
+$opp = $opportunities->create($actor, $a, ['account_id' => $contactAccount['id'], 'title' => '设备维护报价',
+    'currency' => 'CNY', 'amount' => '2400.00', 'expected_close' => $nextMonth]);
+$opportunities->move($actor, $a, $opp['id'], 1, ['stage' => 'qualified', 'decision_contact_id' => $contact['id']]);
+$opportunities->updateProducts($actor, $a, $opp['id'], 2, [[
+    'product_code' => 'MAINT', 'product_version' => '1.0', 'description' => '维护服务', 'quantity' => 2, 'unit_price' => '1200.00',
+]]);
+$opportunities->move($actor, $a, $opp['id'], 3, ['stage' => 'proposal']);
+$opportunityPath = '/?company=' . $a . '&view=opportunities&id=' . $opp['id'];
+same(true, str_contains($client->call($opportunityPath)['body'], '草拟报价'), 'Opportunity screen provides quote form.');
+$newQuote = $client->call($opportunityPath, 'POST', http_build_query([
+    'action' => 'quote.prepare', 'csrf' => $client->csrf, 'request_key' => 'quote-' . $tag,
+    'data' => ['opportunity_id' => $opp['id'], 'opportunity_version' => 4, 'discount_bps' => 0, 'expires_on' => $tomorrow, 'terms' => '维护服务条款'],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $newQuote['code'], 'Workbench form saves quote through shared operations.');
+$quote = $db->row('SELECT id FROM quotes WHERE company_id = ? AND opportunity_id = ?', [$a, $opp['id']]);
+$quotePath = '/?company=' . $a . '&view=quotes&id=' . $quote['id'];
+same(true, str_contains($client->call($quotePath)['body'], '提交折扣审批'), 'Quote view renders product snapshot and approval form.');
+$api = '/api.php?company=' . $a;
+same(200, $client->json($api, ['action' => 'quote.submit', 'data' => $quote + ['version' => 1]], 'submit-' . $tag)['code'], 'Quote can pass normal authorization over the JSON API.');
+same(true, str_contains($client->call($quotePath)['body'], 'data[allocations][0][reference_no]'), 'Approved quote shows nested HTML signing fields.');
+$signed = $client->call($quotePath, 'POST', http_build_query([
+    'action' => 'agreement.sign', 'csrf' => $client->csrf, 'request_key' => 'sign-' . $tag,
+    'data' => $quote + ['version' => 2, 'scope' => 'single', 'allocations' => [[
+        'company_id' => $a, 'account_id' => $contactAccount['id'], 'reference_no' => 'SIGNED-' . $tag, 'amount' => '2400.00',
+        'starts_on' => $tomorrow, 'ends_on' => $nextMonth, 'service_level' => 'standard', 'evidence_ref' => 'EVIDENCE-' . $tag,
+    ]]],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $signed['code'], 'Nested HTML form issues a single-company agreement.');
+$agreement = $db->row('SELECT id FROM agreements WHERE company_id = ? AND quote_id = ?', [$a, $quote['id']]);
+same(true, str_contains($client->call($quotePath)['body'], '签约合同'), 'Signed quote links to the authorized legal contract.');
+$contractPage = $client->call('/?company=' . $a . '&view=agreements&id=' . $agreement['id']);
+same(200, $contractPage['code'], 'Contract detail responds successfully.');
+same(true, str_contains($contractPage['body'], 'EVIDENCE-' . $tag), 'Contract detail renders archived signing reference.');
 $identity->membership($admin, $a, $seller, 'sales', false);
 same(401, $client->call('/api.php?resource=accounts&company=' . $a)['code'], 'Existing browser session expires after role revocation.');
 done('HTTP workbench, cookies, request recovery and CSV');
