@@ -1,0 +1,71 @@
+{
+  "started_fixture": "2026-11-24T17:16:27+00:00",
+  "engine": {
+    "mysql": "8.4.13",
+    "innodb_buffer_pool_bytes": 134217728,
+    "mysql_max_connections": 151,
+    "php": "8.2.30"
+  },
+  "dataset": {
+    "customers": 10000,
+    "tickets": 50000
+  },
+  "clients": 8,
+  "warmup_seconds": 8.201,
+  "measurement_seconds": 30.27,
+  "cases": {
+    "a_accounts_api": {
+      "samples": 121,
+      "status": 200,
+      "p95_ms": 258.73
+    },
+    "a_accounts_html": {
+      "samples": 122,
+      "status": 200,
+      "p95_ms": 269.506
+    },
+    "a_tickets_api": {
+      "samples": 123,
+      "status": 200,
+      "p95_ms": 258.251
+    },
+    "c_tickets_api": {
+      "samples": 124,
+      "status": 200,
+      "p95_ms": 259.283
+    },
+    "c_tickets_api_page_two": {
+      "samples": 124,
+      "status": 200,
+      "p95_ms": 257.57
+    },
+    "c_tickets_html": {
+      "samples": 124,
+      "status": 200,
+      "p95_ms": 274.443
+    },
+    "deny_other_company": {
+      "samples": 123,
+      "status": 404,
+      "p95_ms": 248.256
+    },
+    "deny_foreign_ticket": {
+      "samples": 123,
+      "status": 404,
+      "p95_ms": 260.781
+    },
+    "deny_foreign_export": {
+      "samples": 122,
+      "status": 404,
+      "p95_ms": 255.81
+    },
+    "deny_foreign_attachment": {
+      "samples": 122,
+      "status": 404,
+      "p95_ms": 258.342
+    }
+  },
+  "warmup_errors": {},
+  "errors": {},
+  "passed": true
+}
