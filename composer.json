@@ -1,0 +1,17 @@
+{
+    "name": "customer-suite/customer-suite",
+    "description": "Self-hosted customer operations for sales, delivery and service teams",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {
+        "php": ">=8.2",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "CustomerSuite\\": "src/"
+        }
+    }
+}

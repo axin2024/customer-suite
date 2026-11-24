@@ -1,0 +1,101 @@
+CREATE TABLE IF NOT EXISTS opportunities (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id BIGINT UNSIGNED NOT NULL,
+    account_id BIGINT UNSIGNED NOT NULL,
+    lead_id BIGINT UNSIGNED,
+    owner_id BIGINT UNSIGNED NOT NULL,
+    decision_contact_id BIGINT UNSIGNED,
+    title VARCHAR(180) NOT NULL,
+    stage ENUM('discovery','qualified','proposal','negotiation','won','lost') NOT NULL DEFAULT 'discovery',
+    currency CHAR(3) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    value_minor BIGINT UNSIGNED NOT NULL,
+    probability_bps SMALLINT UNSIGNED NOT NULL DEFAULT 1000,
+    expected_close DATE NOT NULL,
+    next_follow_up DATE,
+    stage_reason VARCHAR(240),
+    version INT UNSIGNED NOT NULL DEFAULT 1,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY opportunities_company_id (company_id, id),
+    UNIQUE KEY opportunities_lead (company_id, lead_id),
+    KEY opportunities_account (company_id, account_id, id),
+    KEY opportunity_worklist (company_id, stage, updated_at DESC, id DESC),
+    KEY opportunity_owner_worklist (company_id, owner_id, stage, updated_at DESC, id DESC),
+    KEY opportunity_forecast (company_id, expected_close, stage, id),
+    KEY opportunity_followup (company_id, owner_id, stage, next_follow_up, id),
+    CHECK (probability_bps <= 10000),
+    CHECK (value_minor <= 9000000000000),
+    FOREIGN KEY (company_id, account_id) REFERENCES accounts (company_id, id),
+    FOREIGN KEY (company_id, lead_id) REFERENCES leads (company_id, id),
+    FOREIGN KEY (company_id, decision_contact_id) REFERENCES contacts (company_id, id),
+    FOREIGN KEY (owner_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS opportunity_lines (
+    company_id BIGINT UNSIGNED NOT NULL,
+    opportunity_id BIGINT UNSIGNED NOT NULL,
+    line_no SMALLINT UNSIGNED NOT NULL,
+    product_code VARCHAR(48) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    product_version VARCHAR(48) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    description VARCHAR(160) NOT NULL,
+    quantity INT UNSIGNED NOT NULL,
+    unit_minor BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (company_id, opportunity_id, line_no),
+    CHECK (quantity BETWEEN 1 AND 1000000),
+    CHECK (unit_minor <= 9000000000000),
+    FOREIGN KEY (company_id, opportunity_id) REFERENCES opportunities (company_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS stage_history (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id BIGINT UNSIGNED NOT NULL,
+    opportunity_id BIGINT UNSIGNED NOT NULL,
+    actor_id BIGINT UNSIGNED NOT NULL,
+    from_stage ENUM('discovery','qualified','proposal','negotiation','won','lost'),
+    to_stage ENUM('discovery','qualified','proposal','negotiation','won','lost') NOT NULL,
+    opportunity_version INT UNSIGNED NOT NULL,
+    probability_bps SMALLINT UNSIGNED NOT NULL,
+    reason VARCHAR(240),
+    occurred_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY stage_history_version (company_id, opportunity_id, opportunity_version),
+    KEY stage_history_as_of (company_id, occurred_at, opportunity_id, to_stage, id),
+    FOREIGN KEY (company_id, opportunity_id) REFERENCES opportunities (company_id, id),
+    FOREIGN KEY (actor_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS forecast_snapshots (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id BIGINT UNSIGNED NOT NULL,
+    created_by BIGINT UNSIGNED NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    captured_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY forecast_company_id (company_id, id),
+    KEY forecasts_since (company_id, captured_at, id),
+    CHECK (period_start <= period_end),
+    FOREIGN KEY (company_id) REFERENCES companies (id),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS forecast_rows (
+    company_id BIGINT UNSIGNED NOT NULL,
+    snapshot_id BIGINT UNSIGNED NOT NULL,
+    opportunity_id BIGINT UNSIGNED NOT NULL,
+    account_id BIGINT UNSIGNED NOT NULL,
+    owner_id BIGINT UNSIGNED NOT NULL,
+    opportunity_version INT UNSIGNED NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    stage ENUM('discovery','qualified','proposal','negotiation','won','lost') NOT NULL,
+    currency CHAR(3) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    value_minor BIGINT UNSIGNED NOT NULL,
+    probability_bps SMALLINT UNSIGNED NOT NULL,
+    weighted_minor BIGINT UNSIGNED NOT NULL,
+    expected_close DATE NOT NULL,
+    PRIMARY KEY (company_id, snapshot_id, opportunity_id),
+    KEY forecast_rows_owner (company_id, snapshot_id, owner_id, currency, opportunity_id),
+    FOREIGN KEY (company_id, snapshot_id) REFERENCES forecast_snapshots (company_id, id),
+    FOREIGN KEY (company_id, opportunity_id) REFERENCES opportunities (company_id, id),
+    FOREIGN KEY (company_id, account_id) REFERENCES accounts (company_id, id),
+    FOREIGN KEY (owner_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

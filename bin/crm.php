@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+use CustomerSuite\BusinessError;
+use CustomerSuite\Database;
+use CustomerSuite\Identity;
+use CustomerSuite\Input;
+use CustomerSuite\Migrations;
+
+require dirname(__DIR__) . '/src/bootstrap.php';
+
+$command = $argv[1] ?? 'help';
+if ($command === 'help') {
+    echo "Customer Suite\n  migrate\n  health\n  init-admin <邮箱> <姓名>\n";
+    echo "初始化管理员前，通过环境变量 CRM_ADMIN_PASSWORD 提供密码。\n";
+    exit(0);
+}
+
+try {
+    $db = Database::connect();
+    $migrations = new Migrations($db, dirname(__DIR__) . '/database/migrations');
+    $result = match ($command) {
+        'migrate' => ['applied' => $migrations->migrate()],
+        'health' => ['status' => $migrations->ready() ? 'ready' : 'migration_required'],
+        'init-admin' => [
+            'user_id' => (new Identity($db))->bootstrap($argv[3] ?? '', $argv[2] ?? '', (string) getenv('CRM_ADMIN_PASSWORD')),
+        ],
+        default => throw new BusinessError('未知命令，请运行 php bin/crm.php help。'),
+    };
+    echo Input::json($result), PHP_EOL;
+    exit(($result['status'] ?? 'ready') === 'ready' ? 0 : 1);
+} catch (Throwable $error) {
+    fwrite(STDERR, $error->getMessage() . PHP_EOL);
+    exit(1);
+}

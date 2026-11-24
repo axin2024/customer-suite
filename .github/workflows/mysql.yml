@@ -1,0 +1,45 @@
+name: MySQL and workbench
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  mysql-and-workbench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CRM_DB_PASSWORD: ci-app-only-local
+      CRM_MYSQL_ROOT_PASSWORD: ci-root-only-local
+      CRM_HTTP_PORT: "8087"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start from empty MySQL database
+        run: docker compose up --build --wait --wait-timeout 150
+      - name: Verify deployment startup
+        run: |
+          curl --fail --silent http://127.0.0.1:8087/health.php
+          docker compose exec -T web php bin/crm.php health
+          curl --fail --silent http://127.0.0.1:8087/ | grep -F '登录客户运营工作台'
+      - name: Run isolated integration and workbench tests
+        run: |
+          docker compose exec -T db sh -ec 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root -e "CREATE DATABASE crm_test CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT ALL PRIVILEGES ON crm_test.* TO customer_suite;"'
+          docker compose cp tests web:/srv/crm/tests
+          docker compose exec -T -e CRM_TEST_DATABASE=1 -e 'CRM_DSN=mysql:host=db;port=3306;dbname=crm_test;charset=utf8mb4' web sh -ec '
+            php bin/crm.php migrate
+            php tests/accounts-marketing.php
+            php tests/sales.php
+            php -S 127.0.0.1:8081 -t public >/tmp/crm-http.log 2>&1 &
+            export CRM_TEST_URL=http://127.0.0.1:8081
+            for attempt in 1 2 3 4 5; do
+              if php -r "exit(@file_get_contents(\"http://127.0.0.1:8081/health.php\") ? 0 : 1);"; then break; fi
+              sleep 1
+            done
+            php tests/http-workbench.php
+          '
+      - name: Read service logs when checks fail
+        if: failure()
+        run: docker compose logs --no-color
