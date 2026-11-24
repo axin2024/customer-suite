@@ -202,7 +202,7 @@ final class Handovers
         return $file;
     }
 
-    private function readable(Access $actor, int $company, int $id): array
+    public function readable(Access $actor, int $company, int $id): array
     {
         $actor->allow($company, 'manager', 'sales', 'delivery');
         $handover = $this->row($company, $id);

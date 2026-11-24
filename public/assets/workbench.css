@@ -74,6 +74,8 @@ summary { font-weight: 700; cursor: pointer; }
 .filters { display: flex; flex-wrap: wrap; gap: 5px; margin: 18px 0 11px; }
 .filters a { padding: 4px 9px; border-radius: 6px; text-decoration: none; }
 .filters a[aria-current] { background: var(--mint); font-weight: 700; }
+.queue-filter { align-items: end; }
+.queue-filter input { width: 160px; }
 .pager { display: inline-block; margin: 0 0 10px; }
 .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: linear-gradient(145deg,#e2f1ed 0%,#f4f7f7 65%); }
 .login-card { width: min(430px,100%); background: #fff; padding: clamp(22px,5vw,42px); border: 1px solid var(--line); border-radius: 13px; box-shadow: 0 12px 38px #183d3612; }

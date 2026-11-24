@@ -244,6 +244,37 @@ same($fileBytes, $download['body'], 'Download returns exactly the uploaded bytes
 same(true, in_array('Content-Digest: sha-256=:' . base64_encode(hash('sha256', $fileBytes, true)) . ':', $download['headers'], true),
     'Response carries digest of archived evidence.');
 same(404, $client->call('/download.php?company=' . $b . '&handover=' . $work['id'])['code'], 'Evidence HTTP route denies cross-company download.');
+$serviceEmail = $tag . '.service@example.test';
+$serviceId = $identity->addUser($admin, '测试工作台服务人员', $serviceEmail, $password);
+$identity->membership($admin, $a, $serviceId, 'service', true);
+$ops->execute($admin, $a, 'service.grant', 'grant-ticket-' . $tag,
+    ['agreement_id' => $agreement['id'], 'user_id' => $serviceId, 'allowed' => true]);
+$serviceClient = new WorkbenchClient($base);
+$serviceClient->login($serviceEmail, $password);
+$ticketPath = '/?company=' . $a . '&view=tickets&state=review';
+$servicePage = $serviceClient->call($ticketPath);
+same(200, $servicePage['code'], 'Ticket workbench and review filter render for service user.');
+same(false, str_contains($servicePage['body'], '服务设置'), 'Service user cannot access manager setting link.');
+same(404, $serviceClient->call('/?company=' . $a . '&view=service-settings')['code'], 'Settings URL also checks manager permission.');
+$receive = $serviceClient->call($ticketPath, 'POST', http_build_query([
+    'action' => 'ticket.receive', 'csrf' => $serviceClient->csrf, 'request_key' => 'ticket-' . $tag,
+    'data' => ['agreement_id' => $agreement['id'], 'category' => 'incident', 'priority' => 'P2', 'title' => '生效前的支持请求',
+        'description' => '预先确认服务账号和工单入口', 'source' => 'test-http', 'external_id' => 'EVENT-' . $tag,
+        'occurred_at' => gmdate('Y-m-d\TH:i:s\Z', time() + 1)],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $receive['code'], 'Service staff can record an out-of-coverage ticket through HTML.');
+$reviewPage = $serviceClient->call($ticketPath);
+same(true, str_contains($reviewPage['body'], '生效前的支持请求'), 'Preserved ticket appears in qualification review worklist.');
+same(true, str_contains($reviewPage['body'], '合同尚未生效'), 'Worklist shows ineligibility reason in Chinese.');
+$ticket = $db->row('SELECT id FROM service_tickets WHERE company_id = ? AND agreement_id = ?', [$a, $agreement['id']]);
+$ticketDetailPath = '/?company=' . $a . '&view=tickets&id=' . $ticket['id'];
+same(200, $serviceClient->call($ticketDetailPath)['code'], 'Scoped service ticket detail renders source and contract.');
+same(404, $serviceClient->call('/?company=' . $b . '&view=tickets&id=' . $ticket['id'])['code'], 'Ticket page denies sibling company access.');
+$identity->membership($admin, $a, $seller, 'manager', true);
+$client->login($email, $password);
+same(true, str_contains($client->call('/?company=' . $a . '&view=service-settings')['body'], '登记工作日历版本'), 'Manager can open versioned service configuration.');
+same(true, str_contains($client->call($ticketDetailPath)['body'], '复核服务资格'), 'Manager sees eligibility decision form.');
+$identity->membership($admin, $a, $seller, 'manager', false);
 $identity->membership($admin, $a, $seller, 'sales', false);
 same(401, $client->call('/api.php?resource=accounts&company=' . $a)['code'], 'Existing browser session expires after role revocation.');
 done('HTTP workbench, cookies, request recovery and CSV');

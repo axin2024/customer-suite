@@ -3,16 +3,18 @@
 declare(strict_types=1);
 
 use CustomerSuite\BusinessError;
+use CustomerSuite\Access;
 use CustomerSuite\Database;
 use CustomerSuite\Identity;
 use CustomerSuite\Input;
 use CustomerSuite\Migrations;
+use CustomerSuite\ServiceTickets;
 
 require dirname(__DIR__) . '/src/bootstrap.php';
 
 $command = $argv[1] ?? 'help';
 if ($command === 'help') {
-    echo "Customer Suite\n  migrate\n  health\n  init-admin <邮箱> <姓名>\n";
+    echo "Customer Suite\n  migrate\n  health\n  init-admin <邮箱> <姓名>\n  sla-sweep <公司编号> <经理编号>\n";
     echo "初始化管理员前，通过环境变量 CRM_ADMIN_PASSWORD 提供密码。\n";
     exit(0);
 }
@@ -26,6 +28,8 @@ try {
         'init-admin' => [
             'user_id' => (new Identity($db))->bootstrap($argv[3] ?? '', $argv[2] ?? '', (string) getenv('CRM_ADMIN_PASSWORD')),
         ],
+        'sla-sweep' => (new ServiceTickets($db))->sweep(new Access($db, Input::id($argv[3] ?? null, '经理编号')),
+            Input::id($argv[2] ?? null, '公司编号')),
         default => throw new BusinessError('未知命令，请运行 php bin/crm.php help。'),
     };
     echo Input::json($result), PHP_EOL;

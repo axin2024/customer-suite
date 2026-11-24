@@ -41,6 +41,17 @@ final class Operations
         'handover.issue.add' => ['id:i', 'version:i', 'title'],
         'handover.issue.resolve' => ['id:i', 'version:i', 'issue_id:i', 'resolution'],
         'handover.accept' => ['id:i', 'version:i', 'agreement_revision:i', 'contact_id:i', 'confirmed_at', 'evidence_reference', 'file_name', 'file_base64:f'],
+        'service.calendar' => ['code', 'name', 'timezone', 'week:j', 'exceptions:j'],
+        'service.policy' => ['service_level', 'effective_from', 'calendar_id:i', 'limits:j', 'pause_for_customer:b'],
+        'service.queue' => ['code', 'name'],
+        'service.route' => ['category', 'queue_id:i'],
+        'service.grant' => ['agreement_id:i', 'user_id:i', 'allowed:b'],
+        'ticket.receive' => ['agreement_id:i', 'category', 'priority', 'title', 'description', 'occurred_at', 'source', 'external_id'],
+        'ticket.review' => ['id:i', 'version:i', 'decision', 'reason'],
+        'ticket.assign' => ['id:i', 'version:i', 'owner_id:i?', 'queue_id:i?', 'reason'],
+        'ticket.note' => ['id:i', 'version:i', 'body'],
+        'ticket.advance' => ['id:i', 'version:i', 'action', 'reason', 'occurred_at?'],
+        'ticket.sweep' => ['occurred_at?'],
     ];
 
     public function __construct(private readonly Database $db)
@@ -97,6 +108,17 @@ final class Operations
             'handover.milestone.add', 'handover.milestone.delay', 'handover.milestone.complete', 'handover.issue.add', 'handover.issue.resolve' =>
                 (new Handovers($this->db))->updateDelivery($actor, $companyId, $data['id'], $data['version'], $action, $data),
             'handover.accept' => (new Handovers($this->db))->accept($actor, $companyId, $data['id'], $data['version'], $data),
+            'service.calendar' => (new ServiceSettings($this->db))->calendar($actor, $companyId, $data),
+            'service.policy' => (new ServiceSettings($this->db))->policy($actor, $companyId, $data),
+            'service.queue' => (new ServiceSettings($this->db))->queue($actor, $companyId, $data),
+            'service.route' => (new ServiceSettings($this->db))->route($actor, $companyId, $data),
+            'service.grant' => (new ServiceSettings($this->db))->grant($actor, $companyId, $data['agreement_id'], $data['user_id'], $data['allowed']),
+            'ticket.receive' => (new ServiceTickets($this->db))->receive($actor, $companyId, $data),
+            'ticket.review' => (new ServiceTickets($this->db))->review($actor, $companyId, $data['id'], $data['version'], $data),
+            'ticket.assign' => (new ServiceTickets($this->db))->assign($actor, $companyId, $data['id'], $data['version'], $data),
+            'ticket.note' => (new ServiceTickets($this->db))->note($actor, $companyId, $data['id'], $data['version'], $data['body']),
+            'ticket.advance' => (new ServiceTickets($this->db))->advance($actor, $companyId, $data['id'], $data['version'], $data),
+            'ticket.sweep' => (new ServiceTickets($this->db))->sweep($actor, $companyId, $data['occurred_at'] ?? null),
         };
     }
 

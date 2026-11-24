@@ -39,6 +39,11 @@ function selectField(string $name, string $label, array $options, bool $required
     echo '</select></label>';
 }
 
+function textAreaField(string $name, string $label, string $value = '', int $rows = 4): void
+{
+    echo '<label>', e($label), '<textarea name="data[', e($name), ']" rows="', e($rows), '" required>', e($value), '</textarea></label>';
+}
+
 function operation(string $csrf, string $action, string $button, callable $fields, array $hidden = [], bool $attachment = false): void
 {
     echo '<form method="post" class="operation"', $attachment ? ' enctype="multipart/form-data"' : '',

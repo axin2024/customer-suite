@@ -28,7 +28,9 @@ final class Receipts
                 throw new BusinessError('请求标识已用于不同内容。', 409);
             }
             if ($row['response'] !== null) {
-                return ['replayed' => true, 'result' => json_decode($row['response'], true, 512, JSON_THROW_ON_ERROR)];
+                $result = json_decode($row['response'], true, 512, JSON_THROW_ON_ERROR);
+                $this->assertReadable($actor, $companyId, $action, $result);
+                return ['replayed' => true, 'result' => $result];
             }
             $result = $write();
             $this->db->run(
@@ -46,8 +48,20 @@ final class Receipts
         if ($row === null || $row['response'] === null) {
             throw new BusinessError('未找到已完成的请求回执。', 404);
         }
-        return ['action' => $row['action'], 'created_at' => $row['created_at'],
-            'result' => json_decode($row['response'], true, 512, JSON_THROW_ON_ERROR)];
+        $result = json_decode($row['response'], true, 512, JSON_THROW_ON_ERROR);
+        $this->assertReadable($actor, $companyId, $row['action'], $result);
+        return ['action' => $row['action'], 'created_at' => $row['created_at'], 'result' => $result];
+    }
+
+    private function assertReadable(Access $actor, int $company, string $action, array $result): void
+    {
+        if ($action === 'ticket.sweep' || str_starts_with($action, 'service.')) {
+            $actor->allow($company, 'manager');
+        } elseif (str_starts_with($action, 'ticket.')) {
+            (new ServiceTickets($this->db))->readable($actor, $company, (int) $result['id']);
+        } elseif (str_starts_with($action, 'handover.')) {
+            (new Handovers($this->db))->readable($actor, $company, (int) $result['id']);
+        }
     }
 
     private function lookUp(array $keyParts): ?array

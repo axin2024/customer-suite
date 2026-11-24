@@ -3,11 +3,19 @@
 declare(strict_types=1);
 
 use CustomerSuite\Money;
+use CustomerSuite\ServiceSettings;
+use CustomerSuite\ServiceTickets;
 use CustomerSuite\Workbench;
 
 require __DIR__ . '/record-forms.php';
 $stateNames = Workbench::STATES;
+if ($view === 'tickets') {
+    $stateNames['open'] = '处理中';
+}
 $baseLink = ['company' => $chosen, 'view' => $view];
+if ($view === 'tickets' && isset($query['queue'])) {
+    $baseLink['queue'] = (int) $query['queue'];
+}
 $columns = match ($view) {
     'accounts' => ['id' => '编号', 'name' => '客户', 'state' => '状态', 'owner_id' => '负责人', 'version' => '版本', 'updated_at' => '更新时间'],
     'leads' => ['id' => '编号', 'name' => '线索', 'state' => '状态', 'owner_id' => '负责人', 'next_follow_up' => '下次跟进', 'version' => '版本'],
@@ -21,6 +29,8 @@ $columns = match ($view) {
         'currency' => '币种', 'value_minor' => '金额', 'ends_on' => '合同到期', 'service_level' => '服务级别'],
     'handovers' => ['id' => '编号', 'reference_no' => '合同编号', 'legal_name' => '签约客户', 'agreement_revision' => '合同版本',
         'state' => '状态', 'owner_id' => '交付负责人', 'version' => '交接工作单版本'],
+    'tickets' => ['id' => '编号', 'title' => '工单', 'priority' => '优先级', 'state' => '状态', 'category' => '分类',
+        'queue_name' => '队列', 'review_reason' => '资格复核', 'escalation_level' => '升级级别', 'owner_id' => '负责人'],
 };
 $renderValue = static function (array $row, string $col) use ($stateNames): string|int {
     $value = $row[$col] ?? null;
@@ -29,6 +39,8 @@ $renderValue = static function (array $row, string $col) use ($stateNames): stri
         'value_minor', 'weighted_minor', 'net_minor', 'gross_minor' => $value === null ? '—' : Money::format((int) $value, $row['currency']),
         'probability_bps', 'discount_bps' => $value === null ? '—' : ($value / 100) . '%',
         'service_level' => \CustomerSuite\Agreements::LEVELS[$value] ?? '—',
+        'category' => ServiceSettings::CATEGORIES[$value] ?? '—',
+        'review_reason' => ServiceTickets::REVIEW_REASONS[$value] ?? '—',
         default => $value === null ? '—' : (string) $value,
     };
 };
@@ -70,9 +82,19 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
             <?php endforeach; ?>
         </nav>
     <?php endif; ?>
+    <?php if ($view === 'tickets'): ?>
+        <form class="filters queue-filter" method="get">
+            <input type="hidden" name="company" value="<?= e($chosen) ?>">
+            <input type="hidden" name="view" value="tickets">
+            <input type="hidden" name="state" value="<?= e($query['state'] ?? 'open') ?>">
+            <label>按队列编号筛选<input type="number" name="queue" min="1" value="<?= e($query['queue'] ?? '') ?>" required></label>
+            <button type="submit">筛选</button>
+            <?php if (isset($query['queue'])): ?><a href="<?= e(url(['company' => $chosen, 'view' => 'tickets', 'state' => $query['state'] ?? 'open'])) ?>">清除</a><?php endif; ?>
+        </form>
+    <?php endif; ?>
     <section class="panel table-panel">
         <?php $rowsTable($result['items'], $columns, match ($view) {
-            'opportunities', 'quotes' => 'title', 'forecasts' => 'label', 'agreements', 'handovers' => 'reference_no', default => 'name',
+            'opportunities', 'quotes', 'tickets' => 'title', 'forecasts' => 'label', 'agreements', 'handovers' => 'reference_no', default => 'name',
         }); ?>
     </section>
     <?php if ($result['next_cursor'] ?? null): ?>
@@ -129,6 +151,9 @@ $rowsTable = static function (array $rows, array $providedColumns, ?string $link
     <?php endif; ?>
     <?php if ($view === 'handovers'): ?>
         <?php require __DIR__ . '/handover-record.php'; ?>
+    <?php endif; ?>
+    <?php if ($view === 'tickets'): ?>
+        <?php require __DIR__ . '/ticket-record.php'; ?>
     <?php endif; ?>
     <?php if ($view === 'forecasts'): ?>
         <section class="panel table-panel"><h2>币种汇总</h2>

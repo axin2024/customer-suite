@@ -44,6 +44,11 @@ final class Queries
             'handovers' => $id === null
                 ? (new Handovers($this->db))->list($actor, $company, Input::text($query['state'] ?? 'executing', '交接状态', 20), $cursor)
                 : (new Handovers($this->db))->detail($actor, $company, $id, $after),
+            'service-settings' => (new ServiceSettings($this->db))->list($actor, $company),
+            'tickets' => $id === null
+                ? (new ServiceTickets($this->db))->list($actor, $company, Input::text($query['state'] ?? 'open', '工单状态', 20),
+                    isset($query['queue']) ? Input::id($query['queue']) : null, $cursor)
+                : (new ServiceTickets($this->db))->detail($actor, $company, $id, $after, Input::optionalText($query['at'] ?? null, '查看时点', 35)),
             'receipts' => (new Receipts($this->db))->read($actor, $company, Input::key($query['key'] ?? null, '请求标识', 128)),
             default => throw new BusinessError('未找到资源。', 404),
         };

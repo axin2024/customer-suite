@@ -85,7 +85,7 @@ try {
                 Input::key($_POST['request_key'] ?? null, '请求标识', 128), $fields);
         }
         $back['view'] = $view;
-        foreach (['id', 'state'] as $parameter) {
+        foreach (['id', 'state', 'queue'] as $parameter) {
             if (isset($query[$parameter]) && is_scalar($query[$parameter])) {
                 $back[$parameter] = (string) $query[$parameter];
             }

@@ -75,7 +75,11 @@ $title = $section[0] ?? ($view === 'settings' ? '组织与权限' : '工作台')
                 <?php if ($receipt): ?>
                     <p role="status" class="notice">操作<?= $receipt['replayed'] ? '已按原回执返回' : '已保存' ?>
                         <?php if (isset($receipt['result']['id'])): ?> · 记录 #<?= e($receipt['result']['id']) ?><?php endif; ?>
-                        <?php if (isset($receipt['result']['version'])): ?> · v<?= e($receipt['result']['version']) ?><?php endif; ?></p>
+                        <?php if (isset($receipt['result']['version'])): ?> · v<?= e($receipt['result']['version']) ?><?php endif; ?>
+                        <?php if ($view === 'tickets' && isset($receipt['result']['count'])): ?> · 已升级 <?= e($receipt['result']['count']) ?> 条<?php endif; ?>
+                        <?php if ($view === 'tickets' && !isset($query['id']) && isset($receipt['result']['id'])): ?>
+                            <a href="<?= e(url(['company' => $chosen, 'view' => 'tickets', 'id' => $receipt['result']['id']])) ?>">查看工单</a>
+                        <?php endif; ?></p>
                 <?php endif; ?>
                 <?php if ($view === 'home'): ?>
                     <?php if ($links === []): ?><p class="empty">当前账户暂无可操作的公司，请联系管理员分配岗位。</p><?php endif; ?>
@@ -89,6 +93,8 @@ $title = $section[0] ?? ($view === 'settings' ? '组织与权限' : '工作台')
                     </div>
                 <?php elseif ($view === 'settings' && $result !== null): ?>
                     <?php require __DIR__ . '/settings.php'; ?>
+                <?php elseif ($view === 'service-settings' && $result !== null): ?>
+                    <?php require __DIR__ . '/service-settings.php'; ?>
                 <?php elseif ($result !== null): ?>
                     <?php require __DIR__ . '/records.php'; ?>
                 <?php endif; ?>

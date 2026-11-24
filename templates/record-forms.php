@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CustomerSuite\Workbench;
+use CustomerSuite\ServiceSettings;
 
 $manager = $actor->has($chosen, 'manager');
 $sales = $actor->has($chosen, 'sales');
@@ -139,4 +140,20 @@ if ($view === 'quotes' && !$detail && $manager) {
     formPanel('设置本公司折扣授权', $csrf, 'quote.policy', '保存折扣规则', static function (): void {
         field('self_approval_bps', '自行审批折扣上限（基点，100 为 1%）');
     });
+}
+
+if ($view === 'tickets' && !$detail) {
+    formPanel('登记工单', $csrf, 'ticket.receive', '保存受理记录', static function (): void {
+        field('agreement_id', '服务合同编号', 'number');
+        selectField('category', '工单分类', ServiceSettings::CATEGORIES);
+        selectField('priority', '优先级', array_combine(ServiceSettings::PRIORITIES, ServiceSettings::PRIORITIES));
+        field('title', '工单标题');
+        field('description', '故障或请求说明');
+        field('source', '来源代码', 'text', true, 'workbench');
+        field('external_id', '来源编号', 'text', true, 'WB-' . bin2hex(random_bytes(8)));
+        field('occurred_at', '事件时间（带时区）', 'text', true, gmdate('Y-m-d\TH:i:s\Z'));
+    });
+    if ($manager) {
+        formPanel('扫描到期工单', $csrf, 'ticket.sweep', '执行超时扫描', static function (): void {});
+    }
 }
