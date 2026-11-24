@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CustomerSuite\Access;
 use CustomerSuite\Identity;
+use CustomerSuite\Input;
 use CustomerSuite\Operations;
 use CustomerSuite\Queries;
 use CustomerSuite\Receipts;
@@ -80,7 +81,8 @@ $write($aSeller, $a, 'opportunity.products', $aOpp + ['version' => 2, 'products'
 $write($aSeller, $a, 'opportunity.move', $aOpp + ['version' => 3, 'stage' => 'proposal']);
 $write($aSeller, $a, 'opportunity.move', $aOpp + ['version' => 4, 'stage' => 'negotiation']);
 $forecast = $write($manager, $a, 'forecast.capture', ['label' => '甲商机预测', 'period_start' => $start, 'period_end' => '2026-12-01']);
-same(60000000, $queries->read($manager, $a, 'forecasts', ['id' => $forecast['id']])['items'][0]['weighted_minor'], 'Integrated forecast produces 600,000 CNY.');
+$forecastRow = $queries->read($manager, $a, 'forecasts', ['id' => $forecast['id']])['items'][0];
+same(60000000, $forecastRow['weighted_minor'], 'Integrated forecast produces 600,000 CNY.');
 $target = $allocations[$b]['account_id'];
 $bOpp = $write($bSeller, $b, 'opportunity.create', ['account_id' => $target, 'title' => '乙日元商机',
     'currency' => 'JPY', 'amount' => '10000', 'expected_close' => '2026-11-30'])['id'];
@@ -121,6 +123,47 @@ same($bOpp, $bDrill['object_id'], 'JPY record is attributed to the correct compa
 same('47500', (string) $bDrill['cny_minor'], 'Zero-decimal JPY converted to CNY cents with exact decimal arithmetic.');
 same('0.04750000', $bDrill['fx_rate'], 'Applied rate kept at eight-digit scale.');
 
+$setTime('2026-11-20T10:02:00Z');
+$identity->membership($admin, $b, $bSeller->userId, 'success', true);
+$write($manager, $b, 'success.assign', ['agreement_id' => $contracts[$b], 'agreement_version' => 1,
+    'owner_id' => $bSeller->userId, 'reason' => '乙分公司续约负责人']);
+$scanned = $write($manager, $b, 'renewal.scan', ['as_of' => '2026-11-20']);
+same(1, $scanned['created_count'], 'Integrated B contract creates exactly one renewal.');
+$bRenewal = $scanned['items'][0];
+same($contracts[$b], $bRenewal['agreement_id'], 'Integrated renewal references B allocation.');
+same(0, $write($manager, $b, 'renewal.scan', ['as_of' => '2026-11-20'])['created_count'], 'Rescanning B produces no second opportunity.');
+$renewalDetails = $queries->read($bSeller, $b, 'renewals', ['id' => $bRenewal['id']]);
+same('2026-11-29', $renewalDetails['cycle_ends_on'], 'B renews the end date of its independent agreement.');
+
+$identity->membership($admin, $c, $cSeller->userId, 'service', true);
+$calendar = $write($manager, $c, 'service.calendar', ['code' => 'C-LOCAL', 'name' => '丙分公司工作日',
+    'timezone' => 'Asia/Shanghai', 'week' => array_fill_keys([1, 2, 3, 4, 5], [['09:00', '12:00'], ['13:00', '18:00']]), 'exceptions' => []]);
+$limits = ['P1' => ['response' => 15, 'resolution' => 60], 'P2' => ['response' => 30, 'resolution' => 120],
+    'P3' => ['response' => 90, 'resolution' => 360], 'P4' => ['response' => 120, 'resolution' => 480]];
+$write($manager, $c, 'service.policy', ['service_level' => 'standard', 'effective_from' => '2026-11-10T00:00:00Z',
+    'calendar_id' => $calendar['id'], 'limits' => $limits, 'pause_for_customer' => true]);
+$queue = $write($manager, $c, 'service.queue', ['code' => 'C-HELP', 'name' => '丙分公司支持']);
+$write($manager, $c, 'service.route', ['category' => 'incident', 'queue_id' => $queue['id']]);
+$write($manager, $c, 'service.grant', ['agreement_id' => $contracts[$c], 'user_id' => $cSeller->userId, 'allowed' => true]);
+$event = ['agreement_id' => $contracts[$c], 'category' => 'incident', 'priority' => 'P2', 'title' => '丙分公司接入支持请求',
+    'description' => '合成支持事件', 'occurred_at' => '2026-11-20T17:50:00+08:00', 'source' => 'group-demo', 'external_id' => 'C-FIRST'];
+$ticket = $write($cSeller, $c, 'ticket.receive', $event, 'group-ticket');
+same($queue['id'], $ticket['queue_id'], 'Integrated C ticket is routed to the company queue.');
+same('2026-11-23 01:20:00.000000', $ticket['clocks']['response']['deadline_at'], 'Friday 17:50 C ticket resumes on Monday under its own calendar.');
+$ticketDetails = $queries->read($cSeller, $c, 'tickets', ['id' => $ticket['id']]);
+same($calendar['id'], $ticketDetails['calendar']['id'], 'Ticket details trace its pinned calendar.');
+same(Input::digest($ticket), Input::digest($write($cSeller, $c, 'ticket.receive', $event, 'group-ticket')), 'Same request key returns the original C ticket.');
+same(Input::digest($ticket), Input::digest($write($cSeller, $c, 'ticket.receive', $event)), 'Replays with a fresh request key still preserve the source event identity.');
+same(1, $db->row('SELECT COUNT(*) AS n FROM service_tickets WHERE company_id = ? AND agreement_id = ?', [$c, $contracts[$c]])['n'],
+    'Replay leaves one persistent C ticket.');
+foreach ([$a => $aSeller, $b => $bSeller, $c => $cSeller] as $company => $seller) {
+    $otherCompanies = array_diff_key($contracts, [$company => true]);
+    foreach ($otherCompanies as $sibling => $siblingContract) {
+        rejects(404, fn () => $queries->read($seller, $company, 'agreements', ['id' => $siblingContract]), 'Legal ledger rejects sibling ID in local context.');
+        rejects(404, fn () => $queries->read($seller, $sibling, 'agreements', ['id' => $siblingContract]), 'Legal ledger rejects sibling company context.');
+    }
+}
+
 $export = new Reports($db);
 $aRows = iterator_to_array($export->export($aSeller, $a, $snapshot['id'], []));
 same([$a, $a], array_column($aRows, 'company_id'), 'AC-16 Sales export contains only records from its own company.');
@@ -137,4 +180,18 @@ rejects(404, fn () => (new Receipts($db))->read($manager, $hq, 'group-report'), 
 $write($manager, $a, 'account.revise', ['id' => $aCustomer, 'version' => 1, 'owner_id' => $anotherSeller->userId]);
 same([], iterator_to_array($export->export($aSeller, $a, $snapshot['id'], [])), 'Account reassignment removes data from old sales exports.');
 $db->run('SET timestamp = 0');
+if (($argv[1] ?? null) === '--evidence') {
+    echo Input::json([
+        'fixture' => $tag,
+        'quote_id' => $quote['id'],
+        'contracts' => $contracts,
+        'a' => ['forecast_id' => $forecast['id'], 'opportunity_id' => $forecastRow['opportunity_id'],
+            'opportunity_version' => $forecastRow['opportunity_version'], 'value_minor' => $forecastRow['value_minor'],
+            'weighted_minor' => $forecastRow['weighted_minor']],
+        'b' => ['renewal_id' => $bRenewal['id'], 'opportunity_id' => $bRenewal['opportunity_id'], 'cycle_ends_on' => $renewalDetails['cycle_ends_on']],
+        'c' => ['ticket_id' => $ticket['id'], 'calendar_id' => $calendar['id'], 'policy_revision' => $ticket['policy_revision'],
+            'response_deadline_utc' => $ticket['clocks']['response']['deadline_at']],
+        'report' => ['id' => $report['id'], 'stage_event_id' => $row['stage_event_id'], 'as_of' => $historical, 'fx_set_id' => $rates['id']],
+    ]), PHP_EOL;
+}
 done('Management reports, historical funnel, rate conversion and company isolation');

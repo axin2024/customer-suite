@@ -22,3 +22,13 @@
 JSON 接口使用 `report.fx`、`report.capture` 操作。查询 `GET /api.php?company=<公司编号>&resource=reports&id=<快照编号>`，可选 `scope_company`、`kind` 与 `stage`。CSV 地址为 `/export.php?company=<公司编号>&report=<快照编号>`。
 
 `tests/management-reports.php` 在 MySQL 验证 AC-15 和 AC-16、三家公司合同来源、阶段回退、两类渠道归因、日元折算及撤权后导出。HTTP 测试补充报告页面、文件下载及精确业务过滤。
+
+## 三公司联测
+
+为独立测试库配置连接参数后，运行以下命令。测试要求库名以 `crm_test` 开头，并使用合成身份和业务输入。每次以新的隔离组织编码创建数据。
+
+```sh
+CRM_TEST_DATABASE=1 php tests/management-reports.php --evidence
+```
+
+脚本先以总部报价签出三份独立合同，并留存共同报价号。随后验证甲公司 100 万商机按 60% 生成 60 万预测，乙公司的合同扫描两次仍只有一条续约，丙公司的周五 17:50 P2 工单在它自己的工作日历上延续至周一 09:20。测试通过后输出报价、合同、商机、预测、续约、工单、日历及报表的持久记录编号。它还会检查同一服务来源重复提交只留下一个工单，三个分公司互相查询对方法定合同被拒绝。
