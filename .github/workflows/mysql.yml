@@ -24,6 +24,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:8087/health.php
           docker compose exec -T web php bin/crm.php health
           curl --fail --silent http://127.0.0.1:8087/ | grep -F '登录客户运营工作台'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8087/subscriptions/1/usage-events)" = 405
       - name: Install and verify the public demo in an empty database
         run: |
           docker compose exec -T db sh -ec 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root -e "CREATE DATABASE crm_demo_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT ALL PRIVILEGES ON crm_demo_ci.* TO customer_suite;"'
@@ -41,6 +42,9 @@ jobs:
           docker compose exec -T -e CRM_TEST_DATABASE=1 -e 'CRM_DSN=mysql:host=db;port=3306;dbname=crm_test;charset=utf8mb4' web sh -ec '
             php bin/crm.php migrate
             php tests/accounts-marketing.php
+            php tests/subscription-plans.php
+            php tests/subscriptions.php
+            php tests/subscription-capacity.php
             php tests/sales.php
             php tests/agreements.php
             php tests/handovers.php

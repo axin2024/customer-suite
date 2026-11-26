@@ -21,7 +21,10 @@ if ($command === 'help') {
     echo "Customer Suite\n  migrate\n  health\n  init-admin <邮箱> <姓名>\n  sla-sweep <公司编号> <经理编号>\n";
     echo "  renewal-scan <公司编号> <经理编号> [窗口天数]\n  outreach-due <公司编号> <经理编号>\n";
     echo "  batch-run <公司编号> <经理编号> [条目数] [任务编号]\n";
+    echo "  demo-subscriptions <演示库管理员邮箱>\n";
     echo "  demo-install <演示库管理员邮箱>\n";
+    echo "  subscription-preflight <公司编号>\n  subscription-backfill <公司编号> <经理编号> [批量大小]\n";
+    echo "  subscription-pilot <公司编号> <经理编号> <当前版本> <active|draining>\n";
     echo "初始化管理员前，通过环境变量 CRM_ADMIN_PASSWORD 提供密码。\n";
     echo "导入演示前，通过环境变量 CRM_DEMO_PASSWORD 提供演示岗位密码。\n";
     exit(0);
@@ -33,9 +36,15 @@ try {
     $result = match ($command) {
         'migrate' => ['applied' => $migrations->migrate()],
         'health' => ['status' => $migrations->ready() ? 'ready' : 'migration_required'],
+        'subscription-preflight' => (new CustomerSuite\SubscriptionPilot($db))->preflight(Input::id($argv[2] ?? null)),
+        'subscription-backfill' => (new CustomerSuite\SubscriptionPilot($db))->backfill(new Access($db,Input::id($argv[3] ?? null)),
+            Input::id($argv[2] ?? null),Input::integer($argv[4] ?? 100,'批量大小',1,500)),
+        'subscription-pilot' => (new CustomerSuite\SubscriptionPilot($db))->change(new Access($db,Input::id($argv[3] ?? null)),
+            Input::id($argv[2] ?? null),Input::integer($argv[4] ?? null,'当前版本',0,PHP_INT_MAX),$argv[5] ?? ''),
         'init-admin' => [
             'user_id' => (new Identity($db))->bootstrap($argv[3] ?? '', $argv[2] ?? '', (string) getenv('CRM_ADMIN_PASSWORD')),
         ],
+        'demo-subscriptions' => (new DemoWorkspace($db))->subscriptions($argv[2] ?? ''),
         'demo-install' => (new DemoWorkspace($db))->install($argv[2] ?? '', (string) getenv('CRM_DEMO_PASSWORD')),
         'sla-sweep' => (new ServiceTickets($db))->sweep(new Access($db, Input::id($argv[3] ?? null, '经理编号')),
             Input::id($argv[2] ?? null, '公司编号')),

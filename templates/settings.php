@@ -19,7 +19,7 @@ formPanel('新增人员', $csrf, 'admin.user', '创建人员', static function (
 formPanel('调整人员岗位', $csrf, 'admin.membership', '保存岗位', static function () use ($companies): void {
     field('user_id', '人员编号', 'number');
     selectField('company_id', '公司', array_column($companies, 'name', 'id'));
-    selectField('role', '岗位', array_combine(Access::ROLES, ['经理', '市场', '销售', '实施', '服务', '客户成功', '审批']));
+    selectField('role', '岗位', array_combine(Access::ROLES, ['经理', '市场', '销售', '实施', '服务', '客户成功', '审批', '计量对接', '财务', '客户管理员']));
     selectField('operation', '操作', ['grant' => '授予', 'revoke' => '撤回']);
 });
 ?>

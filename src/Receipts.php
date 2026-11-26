@@ -55,7 +55,25 @@ final class Receipts
 
     private function assertReadable(Access $actor, int $company, string $action, array $result): void
     {
-        if ($action === 'ticket.sweep' || str_starts_with($action, 'service.')) {
+        if ($action==='usage.review') {
+            $actor->allow($company,'manager','meter');
+        } elseif ($action === 'retention.scan' || str_starts_with($action,'pilot.')) {
+            $actor->allow($company,'manager');
+        } elseif (str_starts_with($action,'retention.')) {
+            (new SuccessContracts($this->db))->readable($actor,$company,$result['agreement_id']);
+        } elseif (in_array($action,['billing.batch','billing.import-payments'],true)) {
+            $actor->allow($company,'manager','finance');
+        } elseif ($action === 'dispute.raise') {
+            $actor->allow($company,'service','manager');
+            (new Subscriptions($this->db))->readable($actor,$company,$result['subscription_id']);
+        } elseif (str_starts_with($action,'billing.') || $action === 'dispute.decide') {
+            $actor->allow($company,'finance','manager');
+            (new Subscriptions($this->db))->readable($actor,$company,$result['subscription_id']);
+        } elseif ($action === 'subscription.viewer') {
+            $actor->allow($company,'manager');
+        } elseif (str_starts_with($action, 'subscription.')) {
+            (new Subscriptions($this->db))->readable($actor,$company,$result['subscription_id']);
+        } elseif ($action === 'plan.publish' || $action === 'ticket.sweep' || str_starts_with($action, 'service.')) {
             $actor->allow($company, 'manager');
         } elseif (str_starts_with($action, 'ticket.')) {
             (new ServiceTickets($this->db))->readable($actor, $company, (int) $result['id']);

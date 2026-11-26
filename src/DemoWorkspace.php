@@ -65,6 +65,53 @@ final class DemoWorkspace
         }
     }
 
+    public function subscriptions(string $email): array
+    {
+        if (!$this->db->row('SELECT id FROM companies WHERE code=?',[self::GROUP_CODE])) {
+            throw new BusinessError('请先运行 demo-install 安装三公司演示。');
+        }
+        $demo = $this->install($email,'')['result'];
+        $company = $demo['companies']['c'];
+        $manager = new Access($this->db,$demo['users']['manager']['id']);
+        $support = new Access($this->db,$demo['users']['c-support']['id']);
+        return (new Receipts($this->db))->run($manager,$company,'installed-subscriptions-v2','demo.subscriptions',[],
+            function () use ($demo,$company,$manager,$support): array {
+                $agreements = new Agreements($this->db);
+                $contract = $agreements->subject($company,$demo['contracts']['c']);
+                $revision = $agreements->revision($company,$contract['id'],$contract['active_revision']);
+                $first = (new DateTimeImmutable($revision['starts_on']))->modify('first day of next month');
+                $next = $first->modify('+1 month');
+                $write = fn(string $action,array $data): array => $this->write($manager,$company,$action,$data);
+                $pilot = new SubscriptionPilot($this->db);
+                if ($pilot->status($company)['state']==='setup') {
+                    $write('pilot.backfill',['limit'=>500]);
+                    $write('pilot.change',['state'=>'active','version'=>0]);
+                }
+                $plan = $write('plan.publish',['code'=>'INDUSTRIAL-SERVICE','name'=>'设备远程巡检','previous_revision'=>0,
+                    'effective_on'=>$revision['starts_on'],'currency'=>'CNY','monthly_fee'=>'100','service_level'=>'standard',
+                    'metrics'=>[['metric'=>'api_calls','included_units'=>100,'overage_fee'=>'2']]]);
+                $sub = $write('subscription.open',['agreement_id'=>$contract['id'],'agreement_revision'=>$revision['revision'],'line_no'=>1,
+                    'plan_id'=>$plan['plan_id'],'entitlement_rev'=>1,'service_company_id'=>$company,'service_account_id'=>$contract['account_id'],
+                    'mode'=>'paid','seats'=>1,'term_start'=>$first->format('Y-m-d'),'term_end'=>$first->modify('+3 months')->format('Y-m-d'),
+                    'billing_timezone'=>'Asia/Shanghai'])['subscription_id'];
+                $usage = (new UsageEvents($this->db))->ingest($manager,$company,$sub,'demo-meter-120',['source'=>'equipment','event_id'=>'inspection-120',
+                    'metric'=>'api_calls','units'=>120,'occurred_at'=>$first->format('Y-m-d').'T12:00:00+08:00']);
+                $issue = function (DateTimeImmutable $month) use ($sub,$write): array {
+                    $draft = $write('billing.draft',['id'=>$sub,'period'=>$month->format('Y-m')]);
+                    return $write('billing.lock',['id'=>$draft['statement_id'],'version'=>$draft['statement_rev'],'digest'=>$draft['digest']]);
+                };
+                $original = $issue($first);
+                $ref = ['id'=>$original['statement_id'],'version'=>$original['statement_rev']];
+                $statement = (new SubscriptionBilling($this->db))->detail($support,$company,$ref['id']);
+                $line = array_values(array_filter($statement['lines'],static fn(array $line): bool => $line['kind']==='overage'))[0];
+                $dispute = $this->write($support,$company,'dispute.raise',$ref+['line_id'=>$line['id'],'units'=>5,'reason'=>'巡检系统重复登记五次']);
+                $credit = $write('dispute.decide',$ref+['dispute_id'=>$dispute['dispute_id'],'dispute_rev'=>1,'decision'=>'credited','reason'=>'已与巡检流水核对']);
+                $adjusted = $issue($next);
+                return ['subscription_id'=>$sub,'usage_id'=>$usage['usage_id'],'credit_id'=>$credit['credit_id'],'original'=>$original,'adjusted'=>$adjusted,
+                    'workbench_path'=>'/?'.http_build_query(['view'=>'subscriptions','company'=>$company,'id'=>$sub,'date'=>$next->format('Y-m-d'),'statement'=>$adjusted['statement_id']])];
+            });
+    }
+
     private function populate(Access $admin, int $group, string $password): array
     {
         $names = ['a' => '甲分公司 · 华东销售', 'b' => '乙分公司 · 华中续约', 'c' => '丙分公司 · 华南支持'];

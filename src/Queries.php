@@ -16,6 +16,15 @@ final class Queries
         $after = isset($query['after']) ? Input::id($query['after']) : 0;
         $cursor = Input::optionalText($query['cursor'] ?? null, '分页标记', 120);
         return match ($resource) {
+            'retention' => (new SubscriptionRenewals($this->db))->board($actor,$company,$query['month'] ?? gmdate('Y-m'),isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX),
+            'statement' => (new SubscriptionBilling($this->db))->detail($actor,$company,$id ?? throw new BusinessError('须指定账单编号。')),
+            'usage-attempts' => (new UsageEvents($this->db))->history($actor,$company,$id ?? throw new BusinessError('须指定订阅编号。'),
+                $query['disposition'] ?? 'conflict',isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX),
+            'subscriptions' => $id === null ? (new Subscriptions($this->db))->register($actor,$company,isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX)
+                    + ['pilot'=>(new SubscriptionPilot($this->db))->status($company)]
+                : (new Subscriptions($this->db))->detail($actor,$company,$id,Input::date($query['date'] ?? gmdate('Y-m-d'))),
+            'subscription-plan' => (new SubscriptionPlans($this->db))->onDate($actor, $company,
+                $id ?? throw new BusinessError('须指定套餐编号。'), Input::date($query['date'] ?? null)),
             'accounts' => $id === null
                 ? (new Accounts($this->db))->list($actor, $company, Input::text($query['state'] ?? 'active', '客户状态', 20), $cursor)
                 : (new Accounts($this->db))->detail($actor, $company, $id, $after),

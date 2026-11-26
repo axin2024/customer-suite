@@ -14,6 +14,11 @@ use CustomerSuite\WebResponse;
 use CustomerSuite\WebSession;
 use CustomerSuite\Workbench;
 
+if (preg_match('#^/subscriptions/[1-9][0-9]*/usage-events$#D', explode('?',$_SERVER['REQUEST_URI'] ?? '/',2)[0])) {
+    require __DIR__.'/api.php';
+    return;
+}
+
 require dirname(__DIR__) . '/src/bootstrap.php';
 
 WebResponse::headers();
@@ -75,6 +80,13 @@ try {
         if ($action === 'handover.accept' && isset($_FILES['evidence_upload'])) {
             $fields = array_replace($fields, Evidence::uploaded($_FILES['evidence_upload']));
         }
+        if ($action==='billing.import-payments') {
+            $file = $_FILES['payments'] ?? [];
+            if (($file['error'] ?? null)!==UPLOAD_ERR_OK || ($file['size'] ?? 0)>262144 || !is_uploaded_file($file['tmp_name'])) {
+                throw new BusinessError('请选择 256 KiB 以内的付款回执文件。');
+            }
+            $fields['csv'] = file_get_contents($file['tmp_name'],false,null,0,262145);
+        }
         $back = $chosen === null ? [] : ['company' => $chosen];
         if (str_starts_with($action, 'admin.')) {
             $result = $workbench->administrative($actor, $action, $fields);
@@ -87,13 +99,20 @@ try {
                 Input::key($_POST['request_key'] ?? null, '请求标识', 128), $fields);
         }
         $back['view'] = $view;
-        foreach (['id', 'state', 'queue', 'revision'] as $parameter) {
+        foreach (['id', 'state', 'queue', 'revision','date','statement','month'] as $parameter) {
             if (isset($query[$parameter]) && is_scalar($query[$parameter])) {
                 $back[$parameter] = (string) $query[$parameter];
             }
         }
         if ($action === 'batch.create') {
             $back = ['company' => $chosen, 'view' => 'batches', 'id' => $_SESSION['flash']['result']['id']];
+        }
+        if ($action === 'subscription.open') {
+            $back = ['company'=>$chosen,'view'=>'subscriptions','id'=>$_SESSION['flash']['result']['subscription_id']];
+        }
+        if ($view === 'subscriptions' && isset($_SESSION['flash']['result']['statement_id'])) {
+            $back['id'] = $_SESSION['flash']['result']['subscription_id'];
+            $back['statement'] = $_SESSION['flash']['result']['statement_id'];
         }
         WebResponse::redirect($back);
     }
@@ -105,6 +124,17 @@ try {
         } elseif ($view !== 'home') {
             $section = Workbench::NAVIGATION[$view];
             $result = (new Queries($db))->read($actor, $chosen, $view, $query);
+            if ($view === 'subscriptions' && isset($query['id'],$query['statement'])) {
+                $statement = (new CustomerSuite\SubscriptionBilling($db))->detail($actor,$chosen,Input::id($query['statement']));
+                if ($statement['subscription_id'] !== $result['subscription_id']) {
+                    throw new BusinessError('该订阅没有此账单。',404);
+                }
+                $result['statement'] = $statement;
+            }
+            if ($view === 'subscriptions' && isset($query['id']) && $actor->has($chosen,'manager','finance','meter')) {
+                $result['attempts'] = (new CustomerSuite\UsageEvents($db))->history($actor,$chosen,$result['subscription_id'],
+                    $query['disposition'] ?? 'conflict',isset($query['before']) ? Input::id($query['before']) : PHP_INT_MAX)['items'];
+            }
             if ($view === 'batches' && !isset($query['id'])) {
                 $result['kinds'] = (new BatchJobs($db))->availableKinds($actor, $chosen);
                 $result['kind'] = Input::text($query['kind'] ?? array_key_first($result['kinds']), '任务类型', 32);

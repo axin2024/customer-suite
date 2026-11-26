@@ -95,6 +95,10 @@ $title = $section[0] ?? ($view === 'settings' ? '组织与权限' : '工作台')
                     </div>
                 <?php elseif ($view === 'settings' && $result !== null): ?>
                     <?php require __DIR__ . '/settings.php'; ?>
+                <?php elseif ($view === 'subscriptions' && $result !== null): ?>
+                    <?php require __DIR__ . '/subscriptions.php'; ?>
+                <?php elseif ($view === 'retention' && $result !== null): ?>
+                    <?php require __DIR__ . '/retention.php'; ?>
                 <?php elseif ($view === 'service-settings' && $result !== null): ?>
                     <?php require __DIR__ . '/service-settings.php'; ?>
                 <?php elseif (in_array($view, ['success-contracts', 'renewals'], true) && $result !== null): ?>

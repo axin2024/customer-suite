@@ -94,4 +94,7 @@ $verify(array_values(array_unique(array_column($summary['items'], 'company_id'))
 $own = iterator_to_array((new Reports($db))->export($support, $c, $data['report_id'], ['kind' => 'agreement']), false);
 $verify(count($own) === 2 && array_unique(array_column($own, 'company_id')) === [$c], 'C CSV query contains only C contracts.');
 $missing(fn () => $read->read($support, $c, 'reports', $report + ['scope_company' => $a]), 'C cannot drill down to A contracts.');
+$billing = $demo->subscriptions($argv[1])['result'];
+$verify($billing['original']['total_minor'] === 14000 && $billing['adjusted']['total_minor'] === 9000, 'Two locked demo bills reconcile to 140 and 90.');
+$verify(Input::digest($billing) === Input::digest($demo->subscriptions($argv[1])['result']), 'Billing demo replay keeps the same trace.');
 printf("Public demo: %d assertions passed.\n", $checks);

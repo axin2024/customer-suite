@@ -19,6 +19,14 @@ try {
     $session = new WebSession($db);
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $resource = $_GET['resource'] ?? null;
+    $usageRoute = preg_match('#^/subscriptions/([1-9][0-9]*)/usage-events$#D',explode('?',$_SERVER['REQUEST_URI'] ?? '/',2)[0],$route) === 1;
+    if ($usageRoute) {
+        $resource = 'usage-events';
+        if ($method !== 'POST') {
+            header('Allow: POST');
+            throw new BusinessError('计量接收接口需要 POST。',405);
+        }
+    }
     $actor = $session->actor();
     if ($resource === 'session' && $method === 'GET') {
         WebResponse::json(['csrf' => $session->csrf(), 'user' => $actor?->user(), 'companies' => $actor?->companies()]);
@@ -50,6 +58,12 @@ try {
             WebResponse::json(['csrf' => $session->csrf(), 'user' => $session->actor()->user()]);
         }
         $company = Input::id($_GET['company'] ?? null, '公司编号');
+        if ($usageRoute) {
+            session_write_close();
+            $result = (new CustomerSuite\UsageEvents($db))->ingest($actor,$company,Input::id($route[1]),
+                Input::key($_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? null,'请求标识',128),$payload);
+            WebResponse::json($result);
+        }
         $action = Input::key($payload['action'] ?? null, '操作', 64);
         $fields = $payload['data'] ?? null;
         if (!is_array($fields) || ($fields !== [] && array_is_list($fields))) {

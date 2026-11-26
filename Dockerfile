@@ -1,6 +1,7 @@
 FROM php:8.4-apache
 
 RUN docker-php-ext-install pdo_mysql \
+    && a2enmod rewrite \
     && php -r 'exit(extension_loaded("mbstring") ? 0 : 1);' \
     && mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 

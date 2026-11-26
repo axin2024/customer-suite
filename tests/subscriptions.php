@@ -1,0 +1,126 @@
+<?php
+
+declare(strict_types=1);
+
+use CustomerSuite\Access;
+use CustomerSuite\Identity;
+use CustomerSuite\Operations;
+use CustomerSuite\Queries;
+
+require __DIR__.'/bootstrap.php';
+require __DIR__.'/SubscriptionFixture.php';
+require __DIR__.'/subscription-race.php';
+$db->run("SET timestamp = UNIX_TIMESTAMP('2027-03-01 00:00:00')");
+$tag = bin2hex(random_bytes(5));
+$password = 'Test-only-'.bin2hex(random_bytes(16));
+$identity = new Identity($db);
+$root = $db->row('SELECT id FROM users WHERE is_admin=1 ORDER BY id LIMIT 1');
+$admin = new Access($db,$root['id'] ?? $identity->bootstrap('管理员',$tag.'@example.test',$password));
+$company = $identity->addCompany($admin,'SUB-'.$tag,'订阅运营公司');
+$f = signedSubscriptionFixture($db,$admin,$company,$tag);
+$ops = new Operations($db);
+$queries = new Queries($db);
+$write = fn(string $action,string $key,array $data): array => $ops->execute($admin,$company,$action,$key,$data)['result'];
+$east = $f['open'] + $f['branches'][0];
+$west = array_replace($f['open'],['seats'=>4,'mode'=>'trial']) + $f['branches'][1];
+$race = ['user'=>$admin->userId,'company'=>$company,'action'=>'open','data'=>$east];
+[$a,$also] = concurrentSubscriptionRequests(['key'=>'east']+$race,['key'=>'parallel-open']+$race);
+same($a['subscription_id'],$also['subscription_id'],'Concurrent openings in separate MySQL sessions resolve to the same subscription');
+same($f['payer'],$a['payer_id'],'Payer retained');
+same(6,$a['seats'],'Six seats allocated to eastern subsidiary');
+same(CustomerSuite\Input::digest($a),CustomerSuite\Input::digest($write('subscription.open','east',$east)),'Retry returns original receipt');
+same($a,$write('subscription.open','new-key',$east),'Business key protects against double opening');
+rejects(409,fn()=>$write('subscription.open','too-many',array_replace($west,['seats'=>5])),'Contract quantity controls concurrent entitlement');
+$b = $write('subscription.open','west',$west);
+same(4,$b['seats'],'Four seats allocated to western subsidiary');
+$read = fn(int $id,string $date): array => $queries->read($admin,$company,'subscriptions',['id'=>$id,'date'=>$date]);
+same('trial',$read($b['subscription_id'],'2027-03-01')['state'],'Trial in effect');
+$write('subscription.convert','converted',['id'=>$b['subscription_id'],'version'=>1,'paid_from'=>'2027-03-16']);
+same('trial',$read($b['subscription_id'],'2027-03-15')['state'],'Paid conversion retains historical trial');
+same('active',$read($b['subscription_id'],'2027-03-16')['state'],'Paid conversion applies on chosen day');
+same(100,$read($a['subscription_id'],'2027-04-30')['metrics'][0]['balance_units'],'Included quota available through last service day');
+same(0,$read($a['subscription_id'],'2027-05-01')['metrics'][0]['balance_units'],'No quota on exclusive end date');
+$write('plan.publish','april',['code'=>'TEAMS','previous_revision'=>1,'name'=>'协作订阅新版','effective_on'=>'2027-04-01','monthly_fee'=>'199.00',
+    'service_level'=>'critical','currency'=>'CNY','metrics'=>[['metric'=>'api_calls','included_units'=>250,'overage_fee'=>'3.00']]]);
+$april = $read($a['subscription_id'],'2027-04-01');
+same([1,10000,100,200],[$april['entitlement_rev'],$april['monthly_minor'],$april['metrics'][0]['included_units'],$april['metrics'][0]['overage_minor']],'Contract retains signed price and quota');
+rejects(409,fn()=>$write('subscription.open','overlap',array_replace($east,['term_start'=>'2027-04-01'])),'Overlapping beneficiary term rejected');
+rejects(404,fn()=>$queries->read($admin,$f['branches'][0]['service_company_id'],'subscriptions',['id'=>$a['subscription_id'],'date'=>'2027-03-01']),'A subsidiary cannot query the billing ledger by ID');
+same(2,$db->row('SELECT COUNT(*) n FROM subscriptions WHERE agreement_id=?',[$f['agreement']])['n'],'Two beneficiaries produce exactly two subscriptions');
+$upgrade = $write('plan.publish','plus',['code'=>'TEAMS-PLUS','previous_revision'=>0,'name'=>'协作增强版','effective_on'=>'2027-04-01','monthly_fee'=>'160.00',
+    'service_level'=>'critical','currency'=>'CNY','metrics'=>[['metric'=>'api_calls','included_units'=>150,'overage_fee'=>'2.00']]]);
+$change = ['id'=>$a['subscription_id'],'version'=>1,'kind'=>'change','effective_on'=>'2027-04-16','plan_id'=>$upgrade['plan_id'],'entitlement_rev'=>1,'reason'=>'合同增购增强服务'];
+$preview = $write('subscription.preview','preview',$change);
+same([10000,13000,3000],[$preview['before_minor'],$preview['after_minor'],$preview['proration_minor']],'April 16 upgrade of 60 per month prorates to 30');
+same(10000,$read($a['subscription_id'],'2027-04-30')['fixed_forecast_minor'],'Preview has no effect');
+$amendment = $write('subscription.amend','signed',$change);
+same(2,$amendment['amendment_rev'],'Amendment has new version');
+same(150,$read($a['subscription_id'],'2027-04-16')['metrics'][0]['balance_units'],'Higher allowance effective on the chosen day');
+same(100,$read($a['subscription_id'],'2027-04-15')['metrics'][0]['balance_units'],'Earlier entitlement remains frozen');
+same(13000,$read($a['subscription_id'],'2027-04-30')['fixed_forecast_minor'],'Forecast matches approved preview');
+rejects(409,fn()=>$write('subscription.amend','stale',$change),'Old version cannot amend twice');
+$cancel = $write('subscription.amend','cancel',['id'=>$b['subscription_id'],'version'=>2,'kind'=>'cancel','effective_on'=>'2027-03-20','reason'=>'不续用']);
+same('2027-04-01',$cancel['effective_on'],'Cancellation after March billing period');
+same('active',$read($b['subscription_id'],'2027-03-31')['state'],'Access continues through end of month');
+same('cancelled',$read($b['subscription_id'],'2027-04-01')['state'],'Access ends at start of new month');
+same(0,$read($b['subscription_id'],'2027-04-01')['metrics'][0]['balance_units'],'Cancellation stops entitlement');
+$race = ['user'=>$admin->userId,'company'=>$company,'action'=>'meter','sub'=>$a['subscription_id'],
+    'data'=>['source'=>'integration','event_id'=>'120','occurred_at'=>'2027-03-08T01:00:00Z','metric'=>'api_calls','units'=>120]];
+[$event,$also] = concurrentSubscriptionRequests(['key'=>'meter120']+$race,['key'=>'meter120-parallel']+$race);
+same($event['usage_id'],$also['usage_id'],'Concurrent metering returns one original usage ID');
+$dispositions = [$event['disposition'],$also['disposition']];
+sort($dispositions);
+same(['accepted','duplicate'],$dispositions,'Independent deliveries produce one accepted and one duplicate record');
+$march = $write('billing.draft','march',['id'=>$a['subscription_id'],'period'=>'2027-03']);
+same(14000,$march['total_minor'],'Monthly base 100 plus 20 excess units charged at 2');
+$locked = $write('billing.lock','lock-march',['id'=>$march['statement_id'],'version'=>$march['statement_rev'],'digest'=>$march['digest']]);
+same('locked',$locked['state'],'Finance locks reviewed March digest');
+$viewBill = fn(int $id): array => $queries->read($admin,$company,'statement',['id'=>$id]);
+$original = array_values(array_filter($viewBill($march['statement_id'])['lines'],fn($l)=>$l['kind']==='overage'))[0];
+same([$event['usage_id'],20,4000],[$original['usage_id'],$original['quantity'],$original['amount_minor']],'Original overage line traceable to meter receipt');
+$credit = ['id'=>$a['subscription_id'],'usage_id'=>$event['usage_id'],'units'=>5,'reason'=>'重复计算五次访问','evidence'=>'ADJ-5'];
+$adjustment = $write('billing.credit','credit-five',$credit);
+same($adjustment['credit_id'],$write('billing.credit','repeat-credit',$credit)['credit_id'],'Financial evidence reusable without second credit');
+rejects(409,fn()=>$write('billing.credit','over-credit',array_replace($credit,['units'=>116,'evidence'=>'BAD'])),'Credits cannot exceed original units');
+$apr = $write('billing.draft','april-bill',['id'=>$a['subscription_id'],'period'=>'2027-04']);
+same(12000,$apr['total_minor'],'April prorated 130 before March credit of 10');
+$retro = array_values(array_filter($viewBill($apr['statement_id'])['lines'],fn($l)=>$l['kind']==='adjustment'))[0];
+same([$event['usage_id'],-5,-1000],[$retro['usage_id'],$retro['quantity'],$retro['amount_minor']],'April credit retains March usage');
+same($original['id'],json_decode($retro['detail'],true)['original_line'],'Adjustment links original immutable line');
+same(4000,array_values(array_filter($viewBill($march['statement_id'])['lines'],fn($l)=>$l['kind']==='overage'))[0]['amount_minor'],'Historical March remains 40');
+$write('billing.lock','lock-april',['id'=>$apr['statement_id'],'version'=>$apr['statement_rev'],'digest'=>$apr['digest']]);
+$may = $write('billing.draft','may-bill',['id'=>$a['subscription_id'],'period'=>'2027-05']);
+same(0,$may['total_minor'],'Neither expired service nor already-applied credit billed in May');
+$retroChange = $write('subscription.amend','late-amend',array_replace($change,['version'=>2,'effective_on'=>'2027-04-20',
+    'plan_id'=>$a['plan_id'],'entitlement_rev'=>2,'reason'=>'补录已签条款']));
+same(1430,$retroChange['proration_minor'],'Late April price increase of 39 for eleven of thirty days');
+$mayUpdated = $write('billing.draft','new-may',['id'=>$a['subscription_id'],'period'=>'2027-05']);
+same([2,1430],[$mayUpdated['statement_rev'],$mayUpdated['total_minor']],'Backdated contractual amendment posts a separate adjustment in May');
+same(12000,$viewBill($apr['statement_id'])['total_minor'],'Locked April amount remains unchanged after backdated contract change');
+$owner = $identity->addUser($admin,'续约专员',$tag.'.retain@example.test',$password);
+$identity->membership($admin,$company,$owner,'success',true);
+$write('success.assign','assign-contract',['agreement_id'=>$f['agreement'],'agreement_version'=>1,'owner_id'=>$owner,'reason'=>'按签约客户分派']);
+$write('subscription.open','next-cycle',array_replace($east,['term_start'=>'2027-05-01','term_end'=>'2027-07-01']));
+$scan = $write('retention.scan','scan-april',['month'=>'2027-04']);
+same(1,$scan['created'],'Two expiring child subscriptions form one contract-level renewal');
+same(0,$write('retention.scan','scan-april-again',['month'=>'2027-04'])['created'],'A second scan cannot duplicate the case');
+$case = $scan['items'][0];
+same([238800,$owner],[$case['forecast_minor'],$case['owner_id']],'Forecast annualizes final contracted monthly fee, excluding cancelled service');
+$follow = $ops->execute(new Access($db,$owner),$company,'retention.follow','customer-touch',['id'=>$case['renewal_id'],'version'=>1,
+    'follow_up'=>'2027-04-22','reason'=>'安排续期复盘','forecast'=>'1800'])['result'];
+same(180000,$follow['forecast_minor'],'Assigned customer manager can record renewal amount and retention action');
+$lost = ['id'=>$case['renewal_id'],'version'=>2,'outcome'=>'lost','reason'=>''];
+rejects(422,fn()=>$write('retention.close','missing-reason',$lost),'Losing a customer requires a reason');
+$write('retention.close','lost',array_replace($lost,['reason'=>'客户关闭该服务分支']));
+$report = $queries->read($admin,$company,'retention',['month'=>'2027-04'])['summary'][0];
+same([1,0,0],[(int)$report['lost'],(int)$report['renewed'],$report['win_rate_bps']],'Lost case excluded from success numerator');
+$june = $write('retention.scan','scan-june',['month'=>'2027-06'])['items'][0];
+$proposal = $write('agreement.propose','renew-term',['id'=>$f['agreement'],'version'=>1,'amount'=>'1950','starts_on'=>'2027-07-01','ends_on'=>'2028-06-30',
+    'service_level'=>'priority','terms'=>'续签年费','reason'=>'续签下一年度']);
+$identity->membership($admin,$company,$owner,'approver',true);
+$ops->execute(new Access($db,$owner),$company,'agreement.decide','renew-signed',['id'=>$f['agreement'],'version'=>$proposal['version'],
+    'decision'=>'signed','reason'=>'收到签署文件','evidence_ref'=>'RENEW-SIGNED']);
+$signed = $write('retention.close','close-june',['id'=>$june['renewal_id'],'version'=>1,'outcome'=>'renewed','signed_agreement_id'=>$f['agreement'],'reason'=>'收到续约正本']);
+same(195000,$signed['signed_minor'],'Won amount is derived from signed successor revision');
+same(10000,$queries->read($admin,$company,'retention',['month'=>'2027-06'])['summary'][0]['win_rate_bps'],'June win rate scopes to the selected cohort');
+done('Subscription activation and frozen entitlements');

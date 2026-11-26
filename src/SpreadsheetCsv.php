@@ -15,6 +15,9 @@ final class SpreadsheetCsv
         fputcsv($out, $columns, ',', '"', '');
         foreach ($rows as $row) {
             $cells = array_map(static function (int|string|null $value): string {
+                if (is_int($value)) {
+                    return (string) $value;
+                }
                 $value = (string) $value;
                 return preg_match('/^\s*[=+\-@]/u', $value) ? "'" . $value : $value;
             }, array_values($row));

@@ -24,6 +24,26 @@ try {
     $actor = $session->actor() ?? throw new BusinessError('请先登录。', 401);
     session_write_close();
     $company = Input::id($_GET['company'] ?? null, '公司');
+    if (($_GET['kind'] ?? '') === 'billing-open') {
+        SpreadsheetCsv::send('billing-open-'.$company.'.csv',['类型','订阅号','处理编号','关联编号'],
+            (new CustomerSuite\SubscriptionPilot($db))->outstanding($actor,$company));
+        exit;
+    }
+    if (isset($_GET['statement'])) {
+        $actor->allow($company,'finance','manager');
+        $id = Input::id($_GET['statement'],'账单');
+        $bill = (new CustomerSuite\SubscriptionBilling($db))->detail($actor,$company,$id);
+        if ($bill['state'] !== 'locked') {
+            throw new BusinessError('请先复核并锁定账单。',409);
+        }
+        $rows = [];
+        foreach ($bill['lines'] as $line) {
+            $rows[] = [$id,$bill['statement_rev'],$bill['subscription_id'],$bill['billing_period'],$line['id'],$line['origin_period'],
+                $line['kind'],$line['usage_id'],$line['plan_id'],$line['rate_rev'],$bill['currency'],$line['quantity'],$line['amount_minor']];
+        }
+        SpreadsheetCsv::send('statement-'.$id.'.csv',['账单号','版本','订阅号','账期','行号','来源账期','费用项目','原用量号','套餐号','价格版本','币种','数量','最小货币单位'],$rows);
+        exit;
+    }
     if (isset($_GET['report'])) {
         $id = Input::id($_GET['report'], '报表');
         $rows = (new Reports($db))->export($actor, $company, $id, $_GET);

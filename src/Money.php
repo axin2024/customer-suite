@@ -44,6 +44,7 @@ final class Money
         if (in_array($currency, self::ZERO_DECIMAL, true)) {
             return (string) $minor;
         }
-        return intdiv($minor, 100) . '.' . str_pad((string) ($minor % 100), 2, '0', STR_PAD_LEFT);
+        $absolute = abs($minor);
+        return ($minor < 0 ? '-' : '') . intdiv($absolute, 100) . '.' . str_pad((string) ($absolute % 100), 2, '0', STR_PAD_LEFT);
     }
 }

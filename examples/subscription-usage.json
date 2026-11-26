@@ -1,0 +1,7 @@
+{
+  "source": "equipment",
+  "event_id": "inspection-121",
+  "occurred_at": "2027-03-12T12:00:00+08:00",
+  "units": 10,
+  "metric": "api_calls"
+}

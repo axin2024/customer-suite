@@ -1,0 +1,147 @@
+{
+  "at_utc": "2026-11-26T14:59:40.6103499Z",
+  "baseline_tag": "v1.1.0",
+  "baseline_commit": "686c1791452410f473b2bd4d17ac295aa864b5f6",
+  "applied": [
+    "012_subscription_plans",
+    "013_subscriptions",
+    "014_subscription_usage",
+    "015_subscription_amendments",
+    "016_subscription_statements",
+    "017_billing_disputes",
+    "018_subscription_renewals",
+    "019_subscription_pilots"
+  ],
+  "old_ledger_checks": [
+    {
+      "company": {
+        "id": 4,
+        "code": "R-A-15F3C5E118"
+      },
+      "baseline": {
+        "agreements": {
+          "count": 1,
+          "sha256": "cff6f12a1c05f97d764a98d5b7f95c3bab6645538d548a1a469fa73075aff5d1"
+        },
+        "contract_versions": {
+          "count": 1,
+          "sha256": "03f31f958ab610c81f6cefed1f1c130ca33cd6cb661feb13a078c1ae2ffe7219"
+        },
+        "tickets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "attachments": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "issues": []
+    },
+    {
+      "company": {
+        "id": 5,
+        "code": "R-B-15F3C5E118"
+      },
+      "baseline": {
+        "agreements": {
+          "count": 1,
+          "sha256": "5d97aa9b9154e1fcba63c01565f7d9ee2be0779124aedafbe288d64b28e1b2dd"
+        },
+        "contract_versions": {
+          "count": 1,
+          "sha256": "db886e697eda862f711d3f8d963decd68e9fbc0ee845ab36327997fcfe9932ed"
+        },
+        "tickets": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "attachments": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "issues": []
+    },
+    {
+      "company": {
+        "id": 6,
+        "code": "R-C-15F3C5E118"
+      },
+      "baseline": {
+        "agreements": {
+          "count": 1,
+          "sha256": "aa321d3b30611b8e983aeac201535c53e815096aac06779009253040c6376550"
+        },
+        "contract_versions": {
+          "count": 1,
+          "sha256": "dd75bb7f1dbf0e0a8adbbb27ced376e9601659dffca7e8a5bb40845296cb69a5"
+        },
+        "tickets": {
+          "count": 1,
+          "sha256": "c1c68b78a00088e196050073fad34ff9980c9453b07af69238533ae8924e189c"
+        },
+        "attachments": {
+          "count": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "issues": []
+    }
+  ],
+  "historic_attachments": [
+    {
+      "company_id": 1,
+      "handover_id": 1,
+      "agreement_id": 1,
+      "agreement_revision": 1,
+      "byte_length": 56,
+      "sha256": "00be99dad7729085a2193fb9ee9e72ceb89546556df280d85b58690aa71f8f95",
+      "recovered_sha256": "00be99dad7729085a2193fb9ee9e72ceb89546556df280d85b58690aa71f8f95",
+      "recovered_length": 56
+    }
+  ],
+  "automatic_subscriptions": 0,
+  "interrupted_producer": true,
+  "restarted_mysql": true,
+  "input": {
+    "source": "recovery",
+    "event_id": "HTTP-DROPPED",
+    "metric": "api_calls",
+    "units": 120,
+    "occurred_at": "2027-03-05T13:20:00+08:00"
+  },
+  "restored": {
+    "receipt": {
+      "usage_id": 1,
+      "billing_period": "2027-03",
+      "disposition": "accepted",
+      "attempt_id": 1
+    },
+    "watermark": {
+      "events": 1,
+      "last_usage_id": 1,
+      "units": "120",
+      "last_occurred_at": "2027-03-05 05:20:00.000000"
+    },
+    "billing": {
+      "subscription_id": 1,
+      "statement_id": 1,
+      "statement_rev": 1,
+      "state": "draft",
+      "billing_period": "2027-03",
+      "currency": "CNY",
+      "total_minor": 14000,
+      "digest": "99686ba827ee0ccd6990035fa9220bfa7a4b7d9a7b78bc7cf2a7cafe9ce842ff"
+    },
+    "contract": {
+      "id": 6,
+      "active_revision": 1,
+      "version": 1,
+      "value_minor": 100000,
+      "evidence_ref": "SIGNED-2ff0607f"
+    }
+  },
+  "backup_sha256": "b56dfaf466abf110fc3c88a4564ec5471bacfa8ae060dc467d9f42d620bd2298",
+  "backup_bytes": 178145
+}

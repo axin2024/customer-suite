@@ -7,6 +7,27 @@ namespace CustomerSuite;
 final class Operations
 {
     private const FIELDS = [
+        'billing.import-payments' => ['csv:csv'],
+        'usage.review' => ['id:i','attempt_id:i','reason'],
+        'pilot.backfill' => ['limit:i'],
+        'pilot.change' => ['version:n','state'],
+        'retention.scan' => ['month'],
+        'retention.follow' => ['id:i','version:i','follow_up','reason','forecast'],
+        'retention.close' => ['id:i','version:i','outcome','reason','signed_agreement_id:i?'],
+        'billing.batch' => ['period','after:i?'],
+        'dispute.raise' => ['id:i','version:i','line_id:i','units:i','reason'],
+        'dispute.decide' => ['id:i','version:i','dispute_id:i','dispute_rev:i','decision','reason'],
+        'billing.payment' => ['id:i','version:i','receipt_no','received_on','amount'],
+        'billing.draft' => ['id:i','period'],
+        'billing.lock' => ['id:i','version:i','digest'],
+        'billing.credit' => ['id:i','usage_id:i','units:i','reason','evidence'],
+        'subscription.preview' => ['id:i','version:i','effective_on','kind','plan_id:i?','entitlement_rev:i?','reason'],
+        'subscription.amend' => ['id:i','version:i','effective_on','kind','plan_id:i?','entitlement_rev:i?','reason'],
+        'subscription.viewer' => ['id:i','user_id:i','allowed:b'],
+        'subscription.open' => ['agreement_id:i','agreement_revision:i','line_no:i','plan_id:i','entitlement_rev:i',
+            'service_company_id:i','service_account_id:i','seats:i','term_start','term_end','billing_timezone','mode'],
+        'subscription.convert' => ['id:i','version:i','paid_from'],
+        'plan.publish' => ['code','name','previous_revision:n','effective_on','currency','monthly_fee','service_level','metrics:j'],
         'account.create' => ['name', 'registration_ref?', 'owner_id:i?', 'parent_id:i?', 'parent_company_id:i?'],
         'account.revise' => ['id:i', 'version:i', 'owner_id:i?', 'state?'],
         'account.alias' => ['id:i', 'version:i', 'source', 'external_id'],
@@ -84,6 +105,24 @@ final class Operations
     private function dispatch(Access $actor, int $companyId, string $action, array $data): array
     {
         return match ($action) {
+            'billing.import-payments' => (new BillingReview($this->db))->importPayments($actor,$companyId,$data['csv']),
+            'usage.review' => (new UsageEvents($this->db))->review($actor,$companyId,$data),
+            'pilot.backfill' => (new SubscriptionPilot($this->db))->backfill($actor,$companyId,$data['limit']),
+            'pilot.change' => (new SubscriptionPilot($this->db))->change($actor,$companyId,$data['version'],$data['state']),
+            'retention.scan' => (new SubscriptionRenewals($this->db))->scan($actor,$companyId,$data['month']),
+            'retention.follow','retention.close' => (new SubscriptionRenewals($this->db))->change($actor,$companyId,$data,$action),
+            'billing.batch' => (new SubscriptionBilling($this->db))->batch($actor,$companyId,$data['period'],$data['after'] ?? 0),
+            'dispute.raise' => (new BillingReview($this->db))->raise($actor,$companyId,$data),
+            'dispute.decide' => (new BillingReview($this->db))->decide($actor,$companyId,$data),
+            'billing.payment' => (new BillingReview($this->db))->payment($actor,$companyId,$data),
+            'billing.draft' => (new SubscriptionBilling($this->db))->draft($actor,$companyId,$data['id'],$data['period']),
+            'billing.lock' => (new SubscriptionBilling($this->db))->lock($actor,$companyId,$data),
+            'billing.credit' => (new SubscriptionBilling($this->db))->credit($actor,$companyId,$data),
+            'subscription.preview','subscription.amend' => (new SubscriptionTerms($this->db))->change($actor,$companyId,$data,$action==='subscription.preview'),
+            'subscription.viewer' => (new Subscriptions($this->db))->grantViewer($actor,$companyId,$data),
+            'subscription.open' => (new Subscriptions($this->db))->open($actor,$companyId,$data),
+            'subscription.convert' => (new Subscriptions($this->db))->convert($actor,$companyId,$data),
+            'plan.publish' => (new SubscriptionPlans($this->db))->publish($actor, $companyId, $data),
             'account.create' => (new Accounts($this->db))->create($actor, $companyId, $data),
             'account.revise' => (new Accounts($this->db))->revise($actor, $companyId, $data['id'], $data['version'],
                 $data['owner_id'] ?? null, $data['state'] ?? null),
@@ -163,6 +202,7 @@ final class Operations
                 continue;
             }
             $data[$name] = match ($type) {
+                'csv' => is_string($value) ? $value : throw new BusinessError('缺少回执 CSV。'),
                 'i' => Input::id($value, $name),
                 'n' => Input::integer($value, $name, 0, 10000),
                 'f' => Evidence::encoded($value),

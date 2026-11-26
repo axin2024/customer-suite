@@ -6,7 +6,7 @@ namespace CustomerSuite;
 
 final class Access
 {
-    public const ROLES = ['manager', 'marketing', 'sales', 'delivery', 'service', 'success', 'approver'];
+    public const ROLES = ['manager', 'marketing', 'sales', 'delivery', 'service', 'success', 'approver', 'meter', 'finance', 'subscriber'];
 
     public function __construct(private readonly Database $db, public readonly int $userId)
     {

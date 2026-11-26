@@ -43,3 +43,13 @@ docker compose --env-file .env.demo -p crm-demo exec -T -e CRM_DEMO_PASSWORD web
 - 用集团经理切至丙，在资格待复核工单上重查过期合同。仍无法受理时，保留来单和来源编号以便后续人工复核。
 
 在独立的已安装演示库执行 `CRM_TEST_DATABASE=1 php tests/demo-verify.php demo-admin@example.test` 可自动核对上述关键业务数据。该命令需传入导入时的 `CRM_DEMO_PASSWORD`，并运行一次重复续约扫描。
+
+## 丙公司的两期账单
+
+在上述演示库执行下列命令。导入会在丙公司的设备服务合同上开通一个月费 100 元、含 100 次巡检调用的套餐，登记 120 次调用，形成原账，再通过客服争议纠正其中 5 次。
+
+```sh
+docker compose --env-file .env.demo -p crm-demo exec -T web php bin/crm.php demo-subscriptions demo-admin@example.test
+```
+
+登录经理或丙公司客服账号，在演示地址后加上回执中的 `workbench_path`。查看当前账单的 −10 元调整、原始用量号和争议号，再打开上一期查看 100 元固定费和 40 元超量费。两期合计分别为 140 元和 90 元。重复导入返回相同的业务编号。

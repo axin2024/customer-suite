@@ -7,6 +7,8 @@ namespace CustomerSuite;
 final class Workbench
 {
     public const NAVIGATION = [
+        'retention' => ['订阅续约看板','按到期月办理客户保留、续期签约和流失复盘',['manager','success']],
+        'subscriptions' => ['订阅运营','开通合同权益，跟踪用量和计费差异',['manager','sales','service','success','finance','meter','subscriber']],
         'accounts' => ['客户档案', '客户主档、联系人与集团关系', ['manager', 'sales', 'success']],
         'campaigns' => ['营销活动', '维护活动渠道并收录带来源标识的线索', ['manager', 'marketing', 'sales']],
         'leads' => ['线索分配', '查看触点归因、认领和资格确认', ['manager', 'marketing', 'sales']],

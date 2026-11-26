@@ -1,0 +1,105 @@
+{
+    "input": [
+        {
+            "source": "S1",
+            "event_id": "E82",
+            "occurred_at": "2027-02-28T16:00:00Z",
+            "units": 10,
+            "metric": "api_calls"
+        },
+        {
+            "source": "S1",
+            "event_id": "E83",
+            "occurred_at": "2027-03-12T12:00:00Z",
+            "units": 110,
+            "metric": "api_calls"
+        }
+    ],
+    "accepted": [
+        {
+            "usage_id": 2,
+            "billing_period": "2027-03",
+            "disposition": "accepted",
+            "attempt_id": 3
+        },
+        {
+            "usage_id": 3,
+            "billing_period": "2027-03",
+            "disposition": "accepted",
+            "attempt_id": 7
+        }
+    ],
+    "conflict_payload": {
+        "source": "S1",
+        "event_id": "E82",
+        "occurred_at": "2027-02-28T16:00:00Z",
+        "units": 12,
+        "metric": "api_calls"
+    },
+    "conflict_receipt": {
+        "usage_id": 2,
+        "billing_period": "2027-03",
+        "disposition": "conflict",
+        "attempt_id": 6
+    },
+    "original_overage": {
+        "id": 9,
+        "origin_period": "2027-03",
+        "origin_key": "usage:3",
+        "kind": "overage",
+        "usage_id": 3,
+        "plan_id": 7,
+        "rate_rev": 1,
+        "quantity": 20,
+        "amount_minor": 4000,
+        "detail": "{\"units\": 110, \"metric\": \"api_calls\", \"free_units\": 100, \"unit_minor\": 200, \"prior_usage\": 10}"
+    },
+    "review_decision": {
+        "subscription_id": 4,
+        "statement_id": 4,
+        "dispute_id": 1,
+        "state": "credited",
+        "dispute_rev": 3,
+        "usage_id": 3,
+        "credit_id": 2
+    },
+    "april_lines": [
+        {
+            "id": 10,
+            "origin_period": "2027-03",
+            "origin_key": "usage:3",
+            "kind": "adjustment",
+            "usage_id": 3,
+            "plan_id": 7,
+            "rate_rev": 1,
+            "quantity": -5,
+            "amount_minor": -1000,
+            "detail": "{\"original_line\": 9, \"previous_minor\": 4000, \"corrected_minor\": 3000}"
+        },
+        {
+            "id": 11,
+            "origin_period": "2027-04",
+            "origin_key": "fixed",
+            "kind": "fixed",
+            "usage_id": null,
+            "plan_id": 7,
+            "rate_rev": 1,
+            "quantity": 1,
+            "amount_minor": 10000,
+            "detail": "{\"segments\": [{\"from\": \"2027-04-01\", \"until\": \"2027-05-01\", \"plan_id\": 7, \"rate_rev\": 1, \"monthly_minor\": 10000}]}"
+        }
+    ],
+    "same_credit_id_seen_by": {
+        "service": 2,
+        "finance": 2,
+        "subscriber": 2
+    },
+    "bank_receipts": [
+        {
+            "id": 3,
+            "receipt_no": "APR-1",
+            "received_on": "2027-05-02",
+            "amount_minor": 4250
+        }
+    ]
+}

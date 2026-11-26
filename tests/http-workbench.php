@@ -410,4 +410,5 @@ same(false, str_contains($sellerCsv['body'], '设备维护报价'), 'Record-kind
 same(false, str_contains($client->call($reportPath)['body'], '总部报告'), 'Branch-only readers see a generic snapshot title.');
 $identity->membership($admin, $a, $seller, 'sales', false);
 same(401, $client->call('/api.php?resource=accounts&company=' . $a)['code'], 'Existing browser session expires after role revocation.');
+require __DIR__.'/subscription-http.php';
 done('HTTP workbench, cookies, request recovery and CSV');

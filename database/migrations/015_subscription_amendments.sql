@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS subscription_amendments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id BIGINT UNSIGNED NOT NULL,
+    subscription_id BIGINT UNSIGNED NOT NULL,
+    revision INT UNSIGNED NOT NULL,
+    effective_on DATE NOT NULL,
+    kind ENUM('change','cancel') NOT NULL,
+    plan_id BIGINT UNSIGNED NOT NULL,
+    entitlement_rev INT UNSIGNED NOT NULL,
+    before_minor BIGINT UNSIGNED NOT NULL,
+    after_minor BIGINT UNSIGNED NOT NULL,
+    proration_minor BIGINT NOT NULL,
+    reason VARCHAR(400) NOT NULL,
+    actor_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY amendment_version (company_id,subscription_id,revision),
+    UNIQUE KEY amendment_effective (company_id,subscription_id,effective_on),
+    FOREIGN KEY (company_id,subscription_id) REFERENCES subscriptions(company_id,id),
+    FOREIGN KEY (company_id,plan_id,entitlement_rev) REFERENCES subscription_rates(company_id,plan_id,revision),
+    FOREIGN KEY (actor_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
