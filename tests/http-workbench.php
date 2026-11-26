@@ -357,6 +357,49 @@ $csvPath = '/export.php?company=' . $a . '&report=' . $report['id'];
 same(true, str_contains($client->call($reportPath)['body'], '导出当前范围 CSV'), 'Report page links the scoped CSV.');
 same(false, str_contains($client->call($reportPath)['body'], '绝不出现在旧公司 CSV'), 'Manager with no subsidiary role does not see its report row.');
 same(404, $client->call($csvPath . '&scope_company=' . $branch)['code'], 'Unauthorized branch filter returns no CSV file.');
+
+$reviewLeadEmail = 'approver-lead-' . $tag . '@example.test';
+$reviewPeerEmail = 'approver-peer-' . $tag . '@example.test';
+$reviewLeadId = $identity->addUser($admin, '独立审批主管', $reviewLeadEmail, $password);
+$reviewPeerId = $identity->addUser($admin, '本公司代办人', $reviewPeerEmail, $password);
+$identity->membership($admin, $a, $reviewLeadId, 'manager', true);
+$identity->membership($admin, $a, $reviewPeerId, 'approver', true);
+$contractPath = '/?company=' . $a . '&view=agreements&id=' . $agreement['id'];
+$proposal = $client->json($api, ['action' => 'agreement.propose', 'data' => $agreement + ['version' => 1, 'amount' => '2500.00',
+    'starts_on' => $tomorrow, 'ends_on' => $nextMonth, 'service_level' => 'standard', 'terms' => '第 2 版待复核条款', 'reason' => '复核新版维护条款']], 'amend-' . $tag);
+same(200, $proposal['code'], 'Seller submits a revision for independent review.');
+$leadClient = new WorkbenchClient($base);
+$leadClient->login($reviewLeadEmail, $password);
+$originalContract = $leadClient->call($contractPath);
+same(true, str_contains($originalContract['body'], '打开待复核的补充协议'), 'The active revision links to the pending revision.');
+same(false, str_contains($originalContract['body'], 'value="agreement.decide"'), 'The old terms do not expose a form for deciding the newer revision.');
+$pendingPath = $contractPath . '&revision=2';
+$pendingPage = $leadClient->call($pendingPath);
+same(true, str_contains($pendingPage['body'], '第 2 版待复核条款'), 'The approval form is presented alongside the pending terms.');
+same(true, str_contains($pendingPage['body'], '本公司代办人'), 'The active same-company approver appears in the delegation selector.');
+same(false, str_contains($pendingPage['body'], $reviewPeerEmail), 'Approver email addresses stay out of the delegation form.');
+$assign = $leadClient->call($pendingPath, 'POST', http_build_query([
+    'action' => 'review.assign', 'csrf' => $leadClient->csrf, 'request_key' => 'review-assign-' . $tag,
+    'data' => $agreement + ['version' => 2, 'kind' => 'agreement', 'delegate_id' => $reviewPeerId, 'hours' => 2],
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $assign['code'], 'The revision-bound assignment is submitted from the actual workbench.');
+same(true, in_array('Location: ' . $pendingPath, $assign['headers'], true), 'The post-redirect keeps the reviewed revision.');
+$peerClient = new WorkbenchClient($base);
+$peerClient->login($reviewPeerEmail, $password);
+$assignedPage = $peerClient->call($pendingPath);
+same(true, str_contains($assignedPage['body'], '代办复核补充协议'), 'The assignee sees that the action will be performed by delegation.');
+same(true, str_contains($assignedPage['body'], 'name="data[delegation_version]" value="1"'), 'The workbench submits approval for the displayed delegation.');
+$decisionData = $agreement + ['version' => 2, 'decision' => 'signed', 'reason' => '完成新版复核', 'evidence_ref' => 'HTTP-REVIEW-2', 'delegation_version' => 1];
+$delegated = $peerClient->call($pendingPath, 'POST', http_build_query([
+    'action' => 'agreement.decide', 'csrf' => $peerClient->csrf, 'request_key' => 'review-final-' . $tag, 'data' => $decisionData,
+]), ['Content-Type: application/x-www-form-urlencoded']);
+same(303, $delegated['code'], 'The delegate can submit the HTML approval form.');
+same(true, str_contains($peerClient->call($pendingPath)['body'], '已代办'), 'The decided revision displays the completed delegation.');
+$delegatedReceipt = $peerClient->call('/api.php?resource=receipts&company=' . $a . '&key=review-final-' . $tag);
+same($reviewLeadId, json_decode($delegatedReceipt['body'], true, flags: JSON_THROW_ON_ERROR)['result']['delegated_by'], 'HTTP receipt preserves the assigning reviewer.');
+same($reviewPeerId, $db->row('SELECT decided_by FROM agreement_versions WHERE company_id = ? AND agreement_id = ? AND revision = 2',
+    [$a, $agreement['id']])['decided_by'], 'The approved revision records the real signer of the review.');
+
 $identity->membership($admin, $a, $seller, 'manager', false);
 $client->login($email, $password);
 $sellerCsv = $client->call($csvPath . '&kind=agreement');

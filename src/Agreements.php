@@ -97,7 +97,8 @@ final class Agreements
         if ($decision === 'signed' && $evidence === null) {
             throw new BusinessError('签署补充协议须登记签署凭据。');
         }
-        return $this->db->transaction(function () use ($actor, $company, $id, $version, $decision, $reason, $evidence): array {
+        $delegationVersion = $data['delegation_version'] ?? null;
+        return $this->db->transaction(function () use ($actor, $company, $id, $version, $decision, $reason, $evidence, $delegationVersion): array {
             $contract = $this->row($company, $id, true);
             Accounts::checkVersion($contract, $version);
             $revision = $this->revision($company, $id, $contract['latest_revision']);
@@ -107,6 +108,7 @@ final class Agreements
             if ($actor->userId === (int) $revision['prepared_by']) {
                 throw new BusinessError('发起人不能复核自己提交的补充协议。', 403);
             }
+            $delegation = (new ReviewDelegations($this->db))->decide($actor, $company, 'agreement', $id, $revision['revision'], $delegationVersion);
             $this->db->run(
                 'UPDATE agreement_versions SET decision = ?,evidence_ref = ?,decided_by = ?,decision_reason = ?,decided_at = UTC_TIMESTAMP(6)
                  WHERE company_id = ? AND agreement_id = ? AND revision = ?',
@@ -115,8 +117,8 @@ final class Agreements
             $activeNo = $decision === 'signed' ? $revision['revision'] : $contract['active_revision'];
             $this->db->run('UPDATE agreements SET active_revision = ?,version = ? WHERE company_id = ? AND id = ?', [$activeNo, $version + 1, $company, $id]);
             $this->audit->record($actor, $company, 'agreement', $id, $version + 1, 'agreement.decide',
-                ['revision' => $revision['revision'], 'decision' => $decision, 'active_revision' => $activeNo]);
-            return ['id' => $id, 'version' => $version + 1, 'revision' => $revision['revision'], 'decision' => $decision, 'active_revision' => $activeNo];
+                ['revision' => $revision['revision'], 'decision' => $decision, 'active_revision' => $activeNo] + $delegation);
+            return ['id' => $id, 'version' => $version + 1, 'revision' => $revision['revision'], 'decision' => $decision, 'active_revision' => $activeNo] + $delegation;
         });
     }
 
@@ -176,7 +178,15 @@ final class Agreements
             unset($contract['source_company_id'], $contract['quote_id'], $contract['quote_revision']);
         }
         $contract['can_change'] = $full;
-        $contract['can_review'] = ($manager || $approval) && (int) $latest['prepared_by'] !== $actor->userId && $latest['decision'] === 'pending';
+        $contract['can_review'] = ($manager || $approval) && (int) $latest['prepared_by'] !== $actor->userId
+            && $latest['decision'] === 'pending' && $contract['state'] !== 'ended';
+        $reviewingRevision = $revision['revision'] === $latest['revision'];
+        $contract['review_revision'] = $contract['can_review'] ? $latest['revision'] : null;
+        $canDelegate = $contract['can_review'] && $reviewingRevision;
+        $delegations = new ReviewDelegations($this->db);
+        $contract['review_delegation'] = $delegations->summary($actor, $company, 'agreement', $id, $revision['revision'], $canDelegate);
+        $contract['delegation_candidates'] = $canDelegate && ($contract['review_delegation']['state'] ?? null) !== 'assigned'
+            ? $delegations->candidates($company, [$actor->userId, $latest['prepared_by']]) : [];
         $contract['latest_decision'] = $full || $latest['revision'] === $revision['revision'] ? $latest['decision'] : null;
         $contract['revisions'] = $full ? $this->db->rows(
             'SELECT revision,based_on,decision,currency,value_minor,ends_on,decided_at FROM agreement_versions

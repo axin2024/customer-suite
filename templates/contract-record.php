@@ -7,6 +7,8 @@ use CustomerSuite\Money;
 use CustomerSuite\Workbench;
 
 $idVersion = ['id' => $result['id'], 'version' => $result['version']];
+$reviewAssignment = $result['review_delegation'];
+$actingFor = ($reviewAssignment['can_act'] ?? false) ? ['delegation_version' => $reviewAssignment['delegation_version']] : [];
 ?>
 <?php if ($view === 'quotes'): ?>
     <section class="panel table-panel"><h2>报价条款和审批</h2>
@@ -54,10 +56,10 @@ $idVersion = ['id' => $result['id'], 'version' => $result['version']];
         <?php endif; ?>
     <?php endif; ?>
     <?php if ($result['state'] === 'pending' && $result['can_review']): ?>
-        <?php formPanel('复核折扣', $csrf, 'quote.decide', '保存审批结论', static function (): void {
+        <?php formPanel($actingFor ? '代办复核折扣' : '复核折扣', $csrf, 'quote.decide', '保存审批结论', static function (): void {
             selectField('decision', '审批结论', ['approved' => '批准', 'rejected' => '拒绝']);
             field('reason', '审批依据');
-        }, $idVersion); ?>
+        }, $idVersion + $actingFor); ?>
     <?php endif; ?>
 <?php else: ?>
     <section class="panel table-panel"><h2>合同第 <?= e($result['revision']) ?> 版</h2>
@@ -88,14 +90,17 @@ $idVersion = ['id' => $result['id'], 'version' => $result['version']];
             field('reason', '变更依据');
         }, $idVersion); ?>
     <?php endif; ?>
-    <?php if ($result['can_review']): ?>
-        <?php formPanel('复核补充协议', $csrf, 'agreement.decide', '保存复核结果', static function (): void {
+    <?php if ($result['can_review'] && $result['review_revision'] !== $result['revision']): ?>
+        <a class="pager" href="<?= e(url($baseLink + ['id' => $result['id'], 'revision' => $result['review_revision']])) ?>">打开待复核的补充协议</a>
+    <?php elseif ($result['can_review']): ?>
+        <?php formPanel($actingFor ? '代办复核补充协议' : '复核补充协议', $csrf, 'agreement.decide', '保存复核结果', static function (): void {
             selectField('decision', '处理结果', ['signed' => '登记签署', 'rejected' => '拒绝']);
             field('evidence_ref', '签署凭据编号（登记签署时必填）', 'text', false);
             field('reason', '复核依据');
-        }, $idVersion); ?>
+        }, $idVersion + $actingFor); ?>
     <?php endif; ?>
 <?php endif; ?>
+<?php require __DIR__ . '/review-delegation.php'; ?>
 <?php if ($result['revisions']): ?>
     <section class="panel table-panel"><h2>版本记录</h2>
         <ul>

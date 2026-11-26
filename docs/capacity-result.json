@@ -1,5 +1,5 @@
 {
-  "started_fixture": "2026-11-24T17:16:27+00:00",
+  "started_fixture": "2026-11-26T02:33:46+00:00",
   "engine": {
     "mysql": "8.4.13",
     "innodb_buffer_pool_bytes": 134217728,
@@ -11,58 +11,58 @@
     "tickets": 50000
   },
   "clients": 8,
-  "warmup_seconds": 8.201,
-  "measurement_seconds": 30.27,
+  "warmup_seconds": 8.248,
+  "measurement_seconds": 30.186,
   "cases": {
     "a_accounts_api": {
-      "samples": 121,
+      "samples": 101,
       "status": 200,
-      "p95_ms": 258.73
+      "p95_ms": 297.989
     },
     "a_accounts_html": {
-      "samples": 122,
+      "samples": 101,
       "status": 200,
-      "p95_ms": 269.506
+      "p95_ms": 296.964
     },
     "a_tickets_api": {
-      "samples": 123,
+      "samples": 101,
       "status": 200,
-      "p95_ms": 258.251
+      "p95_ms": 282.413
     },
     "c_tickets_api": {
-      "samples": 124,
+      "samples": 101,
       "status": 200,
-      "p95_ms": 259.283
+      "p95_ms": 302.578
     },
     "c_tickets_api_page_two": {
-      "samples": 124,
+      "samples": 101,
       "status": 200,
-      "p95_ms": 257.57
+      "p95_ms": 297.06
     },
     "c_tickets_html": {
-      "samples": 124,
+      "samples": 102,
       "status": 200,
-      "p95_ms": 274.443
+      "p95_ms": 296.789
     },
     "deny_other_company": {
-      "samples": 123,
+      "samples": 103,
       "status": 404,
-      "p95_ms": 248.256
+      "p95_ms": 280.235
     },
     "deny_foreign_ticket": {
-      "samples": 123,
+      "samples": 102,
       "status": 404,
-      "p95_ms": 260.781
+      "p95_ms": 293.975
     },
     "deny_foreign_export": {
-      "samples": 122,
+      "samples": 102,
       "status": 404,
-      "p95_ms": 255.81
+      "p95_ms": 288.735
     },
     "deny_foreign_attachment": {
-      "samples": 122,
+      "samples": 101,
       "status": 404,
-      "p95_ms": 258.342
+      "p95_ms": 288.88
     }
   },
   "warmup_errors": {},

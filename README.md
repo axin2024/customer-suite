@@ -43,6 +43,7 @@ docker compose exec -T -e CRM_ADMIN_PASSWORD web php bin/crm.php init-admin admi
 ## 兼容与验收
 
 - 七份 [产品需求](docs/requirements/01-产品总览-prd.md) 和 [验收标准](docs/requirements/04-验收与运营-prd.md) 随仓库分发。
+- [24 项业务功能核对](docs/prd-verification.md) 逐项列出业务实现和测试入口。
 - 集成测试使用名字以 `crm_test` 开头的独立 MySQL 数据库。显式设置 `CRM_TEST_DATABASE=1`，按 [CI 工作流](.github/workflows/mysql.yml) 执行 MySQL 和 HTTP 测试。
 - [发行验收](docs/acceptance.md) 列出 16 个业务场景及复核脚本。[版本变更](CHANGELOG.md) 记录迁移范围。
 - 自托管备份及三公司联测的恢复核验见 [备份、恢复与校验](docs/backup-and-restore.md)。

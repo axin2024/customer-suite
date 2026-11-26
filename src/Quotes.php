@@ -98,12 +98,12 @@ final class Quotes
         });
     }
 
-    public function decide(Access $actor, int $company, int $id, int $version, string $decision, string $reason): array
+    public function decide(Access $actor, int $company, int $id, int $version, string $decision, string $reason, ?int $delegationVersion = null): array
     {
         $actor->allow($company, 'manager', 'approver');
         $decision = Input::choice($decision, '审批结论', ['approved', 'rejected']);
         $reason = Input::text($reason, '审批依据', 400);
-        return $this->db->transaction(function () use ($actor, $company, $id, $version, $decision, $reason): array {
+        return $this->db->transaction(function () use ($actor, $company, $id, $version, $decision, $reason, $delegationVersion): array {
             $quote = $this->row($company, $id, true);
             Accounts::checkVersion($quote, $version);
             $this->checkState($quote, 'pending');
@@ -114,12 +114,13 @@ final class Quotes
             if ($decision === 'approved') {
                 $this->checkExpiry($revision['expires_on']);
             }
+            $delegation = (new ReviewDelegations($this->db))->decide($actor, $company, 'quote', $id, $quote['revision'], $delegationVersion);
             $this->db->run(
                 'UPDATE quote_review SET decision = ?,decided_by = ?,reason = ?,decided_at = UTC_TIMESTAMP(6)
                  WHERE company_id = ? AND quote_id = ? AND revision = ?',
                 [$decision, $actor->userId, $reason, $company, $id, $quote['revision']],
             );
-            return $this->recordState($actor, $company, $quote, $decision, 'quote.decide');
+            return $this->recordState($actor, $company, $quote, $decision, 'quote.decide', $delegation);
         });
     }
 
@@ -180,6 +181,11 @@ final class Quotes
         $quote['can_prepare'] = $controls;
         $quote['can_review'] = ($reviewer || $actor->has($company, 'manager'))
             && !in_array($actor->userId, [(int) $revision['prepared_by'], (int) $revision['submitted_by']], true);
+        $canDelegate = $quote['state'] === 'pending' && $quote['can_review'] && $revision['expires_on'] >= $this->today();
+        $delegations = new ReviewDelegations($this->db);
+        $quote['review_delegation'] = $delegations->summary($actor, $company, 'quote', $id, $revisionNo, $canDelegate);
+        $quote['delegation_candidates'] = $canDelegate && ($quote['review_delegation']['state'] ?? null) !== 'assigned'
+            ? $delegations->candidates($company, [$actor->userId, $revision['prepared_by'], $revision['submitted_by']]) : [];
         $quote['products'] = $this->db->rows(
             'SELECT line_no,product_code,product_version,description,quantity,unit_minor FROM quote_lines
              WHERE company_id = ? AND quote_id = ? AND revision = ? ORDER BY line_no', [$company, $id, $revisionNo],

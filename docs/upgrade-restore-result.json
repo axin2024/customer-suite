@@ -1,0 +1,16 @@
+{
+  "previous_tag": "v1.0.0",
+  "previous_commit": "cb1695a891bd658e3727583c42715b8a5f53fc84",
+  "migrations": [
+    "011_review_delegations"
+  ],
+  "matching_business_facts": true,
+  "matching_delegated_decisions": 2,
+  "contracts": 3,
+  "forecast_weighted_minor": 60000000,
+  "renewal_count": 1,
+  "service_deadline_utc": "2026-11-23 01:20:00.000000",
+  "attachments": 1,
+  "backup_bytes": 153864,
+  "backup_sha256": "5747900ac73f404787ca9d0aefe954a7882cede8cbe79b0a0ffc1794d6bcc045"
+}
